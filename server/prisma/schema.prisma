@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  googleId    String?  @unique
+  email       String?  @unique
+  displayName String   @default("Anonymous")
+  avatar      String?
+  guestId     String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Document {
+  id           String   @id @default(cuid())
+  shortId      String   @unique
+  title        String   @default("Untitled")
+  content      String   @default("")
+  owner        String?  // References User.guestId or similar, kept as string for flexibility
+  lastEditedBy String?
+  images       Json?    @default("[]") // Stores array of image objects
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

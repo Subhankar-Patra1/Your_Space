@@ -1,0 +1,14 @@
+{
+  "name": "your-space",
+  "version": "1.0.0",
+  "description": "A minimalist real-time collaborative text editor",
+  "scripts": {
+    "dev:server": "cd server && node index.js",
+    "dev:client": "cd client && npm run dev",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install"
+  },
+  "dependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
