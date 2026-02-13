@@ -2,11 +2,11 @@
 
 <div align="center">
 
-![Your Space Logo](client/public/favicon.svg)
+<img src="client/public/favicon.svg" alt="Your Space Logo" width="120" />
 
 ### A Minimalist, Real-Time Collaborative Writing Environment.
 
-[Demo](https://your-space.vercel.app) · [Report Bug](https://github.com/Subhankar-Patra1/Your_Space/issues) · [Request Feature](https://github.com/Subhankar-Patra1/Your_Space/issues)
+[Demo](https://yourspace-web.vercel.app) · [Report Bug](https://github.com/Subhankar-Patra1/Your_Space/issues) · [Request Feature](https://github.com/Subhankar-Patra1/Your_Space/issues)
 
 </div>
 
