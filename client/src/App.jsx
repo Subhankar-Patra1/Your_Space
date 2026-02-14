@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Landing from './pages/Landing';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+// import Landing from './pages/Landing'; // Removed
 import Editor from './pages/Editor';
 import Dashboard from './pages/Dashboard';
 import NamePrompt from './components/NamePrompt';
@@ -17,7 +17,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/note/:shortId" element={<Editor />} />
         <Route path="/dashboard" element={<Dashboard />} />
       </Routes>

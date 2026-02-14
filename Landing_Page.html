@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth dark"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Your Space | Avant-Garde Editor</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#FF4F00", // International Orange
+                        "electric-blue": "#007BFF",
+                        "emerald-green": "#10B981",
+                        "background-light": "#FAFAFA",
+                        "background-dark": "#050505",
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#121212",
+                        "border-light": "#E5E5E5",
+                        "border-dark": "#262626",
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                    },
+                    boxShadow: {
+                        'glow': '0 0 20px rgba(255, 79, 0, 0.3)',
+                        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+                        'glow-blue': '0 0 15px rgba(0, 123, 255, 0.4)',
+                        'glow-green': '0 0 15px rgba(16, 185, 129, 0.4)',
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'type-trail': 'typeTrail 2s ease-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0) rotateX(10deg)' },
+                            '50%': { transform: 'translateY(-20px) rotateX(10deg)' },
+                        },
+                        typeTrail: {
+                            '0%': { opacity: 0.8, transform: 'translateX(0)' },
+                            '100%': { opacity: 0, transform: 'translateX(-10px)' },
+                        }
+                    }
+                },
+            },
+        };
+    </script>
+<style>
+        .liquid-metal-text {
+            background: linear-gradient(135deg, #E0E0E0 0%, #FFFFFF 25%, #A0A0A0 50%, #FFFFFF 75%, #C0C0C0 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0px 0px 10px rgba(255, 255, 255, 0.2);
+        }
+        .cursor-glow {
+            display: inline-block;
+            width: 2px;
+            height: 1.2em;
+            background-color: currentColor;
+            animation: blink 1s step-end infinite;
+            box-shadow: 0 0 10px currentColor;
+            vertical-align: text-bottom;
+        }
+        .cursor-static {
+            display: inline-block;
+            width: 2px;
+            height: 1.4em;
+            background-color: currentColor;
+            vertical-align: text-bottom;
+            position: relative;
+        }
+        .cursor-label {
+            position: absolute;
+            top: -1.4em;
+            left: -0.2em;
+            padding: 0.1em 0.4em;
+            border-radius: 4px;
+            font-size: 0.6em;
+            font-weight: 600;
+            color: white;
+            white-space: nowrap;
+            pointer-events: none;
+            font-family: 'Inter', sans-serif;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .glass-panel {
+            background: rgba(18, 18, 18, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .invisible-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            width: 100%;
+        }
+        ::selection {
+            background-color: rgba(255, 79, 0, 0.3);
+            color: inherit;
+        }
+        .typing-effect {
+             display: inline-block;
+             position: relative;
+        }
+        .typing-effect::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 20px;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.1));
+            filter: blur(4px);
+            animation: pulse-trail 0.5s infinite alternate;
+        }
+        @keyframes pulse-trail {
+            0% { opacity: 0.3; transform: translateX(0); }
+            100% { opacity: 0; transform: translateX(-5px); }
+        }
+        .perspective-container {
+            perspective: 1200px;
+        }
+        .glass-slab {
+            transform-style: preserve-3d;
+            transform: rotateX(20deg) scale(0.9);
+            transition: transform 0.5s ease-out;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 
+                        0 0 30px rgba(255, 255, 255, 0.05) inset;
+        }
+        .glass-slab:hover {
+            transform: rotateX(10deg) scale(0.95);
+        }
+        .bg-grid {
+            background-size: 60px 60px;
+            mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+            -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 80%, transparent);
+        }
+        #features-grid > div {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #features-grid > div.in-view {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-gray-900 dark:text-white antialiased min-h-screen selection:bg-primary selection:text-white">
+<div class="fixed inset-0 z-0 pointer-events-none">
+<div class="absolute inset-0 bg-noise opacity-30 mix-blend-overlay"></div>
+<div class="absolute inset-0 bg-grid-pattern opacity-[0.07] bg-grid"></div>
+<div class="absolute top-[-20%] left-[20%] w-[600px] h-[600px] bg-primary/10 rounded-full blur-[120px]"></div>
+</div>
+<main class="relative z-10 flex flex-col items-center w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-32">
+<header class="w-full py-8 flex justify-between items-center opacity-0 pointer-events-none">
+<span class="text-xl font-bold">YS</span>
+</header>
+<section class="w-full flex flex-col items-center text-center mt-12 mb-20 relative">
+<div class="mb-4">
+<span class="px-4 py-1 rounded-full border border-white/10 bg-white/5 text-xs font-light uppercase tracking-widest text-gray-400 backdrop-blur-sm">
+                    v2.0 Beta Live
+                </span>
+</div>
+<h1 class="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tighter leading-[0.9] mb-8">
+                COLLABORATE IN<br/>
+<span class="text-liquid italic pr-2">YOUR SPACE</span>
+</h1>
+<p class="text-lg md:text-xl text-gray-400 font-light max-w-2xl mb-6 tracking-wide">
+                The avant-garde editor for synchronized thought. <br/>
+                Where structure meets fluidity.
+            </p>
+<div class="w-full max-w-lg relative group">
+<div class="absolute -inset-0.5 bg-gradient-to-r from-gray-700 to-gray-600 rounded-full blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+<div class="relative flex items-center bg-[#0a0a0a] border border-white/10 rounded-full p-2 shadow-2xl">
+<span class="material-icons text-gray-500 ml-4">terminal</span>
+<input id="hero-input" class="w-full bg-transparent border-none text-white placeholder-gray-600 focus:ring-0 px-4 font-mono text-sm" placeholder="Type 'join room' or 'new draft'..." type="text"/>
+<button id="hero-button" class="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-primary hover:bg-orange-600 text-white rounded-full transition-colors duration-300 shadow-[0_0_15px_rgba(255,79,0,0.5)]">
+<span class="material-icons text-sm font-bold rotate-0 group-hover:rotate-90 transition-transform">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+<div class="relative w-full">
+<section class="w-full perspective-container h-[600px] flex justify-center items-center z-10 relative sticky top-0 mb-40">
+<div id="editor-window" class="glass-slab relative w-full max-w-5xl h-[600px] bg-background-dark/90 backdrop-blur-xl rounded-xl border border-primary/30 flex flex-col shadow-[0_0_50px_rgba(255,79,0,0.15)] transform-gpu transition-all duration-100 ease-out will-change-transform">
+    <!-- Window Header -->
+    <div class="glass-panel w-full px-4 py-3 flex items-center justify-between border-b border-white/5 bg-black/40 z-20 rounded-t-xl">
+        <div class="flex items-center space-x-2">
+            <div class="w-3 h-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
+            <div class="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+            <div class="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+        </div>
+        <div class="flex items-center space-x-2 opacity-60">
+             <span class="material-icons text-sm text-gray-500">grid_view</span>
+             <span class="text-xs font-mono text-gray-400">Your Space / manifesto.md</span>
+        </div>
+        <div class="flex items-center space-x-3">
+             <div class="flex -space-x-2">
+                  <div class="w-6 h-6 rounded-full bg-indigo-500 ring-2 ring-black flex items-center justify-center text-[10px] text-white font-bold">S</div>
+                  <div class="w-6 h-6 rounded-full bg-emerald-500 ring-2 ring-black flex items-center justify-center text-[10px] text-white font-bold">A</div>
+             </div>
+             <div class="w-2 h-2 rounded-full bg-green-500 shadow-glow-green"></div>
+        </div>
+    </div>
+
+    <!-- Window Body -->
+    <div class="relative flex-1 bg-background-dark p-8 md:p-12 font-sans group text-left rounded-b-xl">
+        <!-- Background elements -->
+        <div class="absolute top-0 left-0 w-full h-full bg-grain opacity-20 pointer-events-none rounded-b-xl"></div>
+        <div class="absolute top-[-50%] right-[-10%] w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+        <!-- Editor Content -->
+        <div class="relative z-10 max-w-3xl mx-auto">
+             <h1 class="text-4xl md:text-5xl font-display font-bold text-white mb-8 pb-4 border-b border-white/5">
+                 The Future of Interface
+             </h1>
+             
+             <div class="prose prose-invert max-w-none text-lg leading-relaxed text-gray-300">
+                 <p class="mb-6">
+                     We are designing for a world that moves faster than light. The tools we use must not only keep up but anticipate our next thought. <span class="text-primary/70 font-mono text-sm">#manifesto</span>
+                 </p>
+                 
+                 <p class="mb-6 relative">
+                     The interface is no longer a static page; it is a 
+                     <span class="relative inline-block">
+                         <span id="sarah-text" class="text-electric-blue"></span>
+                         <span id="sarah-cursor" class="cursor-static text-electric-blue shadow-glow-blue h-5 -mb-1 ml-0.5 transition-all duration-75">
+                             <span class="cursor-label bg-electric-blue">Sarah</span>
+                         </span>
+                     </span>
+                 </p>
+
+                 <p class="mb-8">
+                     Collaboration happens in the spaces between keystrokes.
+                     <span class="relative inline-block">
+                         <span id="alex-text" class="text-emerald-green"></span>
+                         <span id="alex-cursor" class="cursor-static text-emerald-green shadow-glow-green h-5 -mb-1 ml-0.5 transition-all duration-75">
+                             <span class="cursor-label bg-emerald-green">Alex</span>
+                         </span>
+                     </span>
+                 </p>
+
+                 <!-- Slash Menu Simulation -->
+                 <div class="relative mt-8 p-2 border border-white/10 rounded-xl bg-surface-dark/80 backdrop-blur-md w-64 shadow-2xl z-50">
+                      <div class="px-2 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Basic blocks</div>
+                      <div class="space-y-1">
+                          <div class="flex items-center gap-3 px-2 py-2 hover:bg-white/5 rounded-lg cursor-pointer group transition-colors">
+                               <div class="w-8 h-8 rounded-md bg-white/10 flex items-center justify-center text-sm text-gray-400 group-hover:text-white font-serif">T</div>
+                               <div class="text-sm text-gray-300 font-medium">Text</div>
+                          </div>
+                          <div class="flex items-center gap-3 px-2 py-2 bg-primary/10 rounded-lg cursor-pointer border border-primary/20">
+                               <div class="w-8 h-8 rounded-md bg-primary/20 flex items-center justify-center text-xs text-primary"><span class="material-icons text-base">image</span></div>
+                               <div class="text-sm text-white font-medium">Image</div>
+                          </div>
+                          <div class="flex items-center gap-3 px-2 py-2 hover:bg-white/5 rounded-lg cursor-pointer group transition-colors">
+                               <div class="w-8 h-8 rounded-md bg-white/10 flex items-center justify-center text-sm text-gray-400 group-hover:text-white"><span class="material-icons text-base">check_box</span></div>
+                               <div class="text-sm text-gray-300 font-medium">To-do List</div>
+                          </div>
+                      </div>
+                 </div>
+             </div>
+        </div>
+    </div>
+</div>
+</section>
+<div id="stacking-container" class="relative w-full bg-background-dark z-30">
+    <!-- Card 1: Frictionless Flow State -->
+    <section id="feature-1" class="sticky top-0 h-screen w-full flex items-center justify-center overflow-hidden border-t border-white/5 bg-background-dark will-change-transform z-30" style="transform: scale(0.8); opacity: 0.5;">
+        <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center h-full">
+            <div class="order-2 lg:order-1 relative h-[400px] w-full rounded-lg overflow-hidden group">
+                <div class="absolute inset-0 bg-neutral-900 border border-white/5 rounded-lg"></div>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <div class="relative w-64 h-80 bg-black border border-white/10 rounded shadow-2xl transform transition-transform duration-700 group-hover:scale-105 group-hover:-rotate-2 flex flex-col p-4">
+                        <div class="w-full h-2 bg-white/10 rounded mb-4"></div>
+                        <div class="w-3/4 h-2 bg-white/10 rounded mb-4"></div>
+                        <div class="flex-1"></div>
+                        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border border-primary/30 flex items-center justify-center animate-pulse-slow">
+                            <div class="w-2 h-2 bg-primary rounded-full"></div>
+                        </div>
+                    </div>
+                </div>
+                <img class="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-overlay pointer-events-none" data-alt="Abstract minimal dark texture representing focus and depth" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVt1DhfeeJM4RPq1WHpqohHXGqjssshRAa5ielSAWSxPsIKgmlYNTPQpEuQjGLD-oIU-c22UZO9HfE06cm28ySiSb3ArorbYAAHVYrIgMrW0jV1BUygrPnTRR1W1H0uzJAPlhWe3N81yOoicW5eHeqQdr2i5TDvETfW90SB8P_vzU7A7sbprq7V8IWKHxyY0GhtVHMVLvBr6LkIuHTgu0pN0BMUrHm8umF44eoGmN7UGEooNEV9tiitXBvNRASLpZoyuchGwJFLrk"/>
+            </div>
+            <div class="order-1 lg:order-2 flex flex-col justify-center pl-0 lg:pl-12">
+                <h2 class="text-5xl font-bold mb-6 tracking-tight">Frictionless<br/><span class="text-gray-600">Flow State.</span></h2>
+                <p class="text-gray-400 text-lg leading-relaxed max-w-md">
+                    Eliminate distractions with a UI that retreats into the shadows. Focus mode activates automatically when your typing velocity increases.
+                </p>
+                <div class="mt-8 flex items-center space-x-4">
+                    <span class="h-px w-12 bg-primary"></span>
+                    <span class="text-xs font-mono uppercase tracking-widest text-primary">Zero Latency</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Card 2: Deep Logic -->
+    <section id="feature-2" class="sticky top-0 h-screen w-full flex items-center justify-center overflow-hidden border-t border-white/5 bg-background-dark z-40 shadow-[0_-20px_50px_rgba(0,0,0,0.5)] will-change-transform">
+        <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center h-full">
+            <div class="flex flex-col justify-center pr-0 lg:pr-12">
+                <h2 class="text-5xl font-bold mb-6 tracking-tight">Deep<br/><span class="text-gray-600">Logic.</span></h2>
+                <p class="text-gray-400 text-lg leading-relaxed max-w-md">
+                    Structure isn't an afterthought. Drag, drop, and nest your ideas in a spatial canvas that understands hierarchy.
+                </p>
+                <div class="mt-8 flex items-center space-x-4">
+                    <span class="h-px w-12 bg-white/20"></span>
+                    <span class="text-xs font-mono uppercase tracking-widest text-white/50">Spatial Graph</span>
+                </div>
+            </div>
+            <div class="relative h-[400px] w-full rounded-lg overflow-hidden group">
+                <div class="absolute inset-0 bg-neutral-900 border border-white/5 rounded-lg"></div>
+                <div class="absolute inset-0 flex items-center justify-center p-8">
+                    <div class="grid grid-cols-2 gap-4 w-full h-full max-w-sm transform group-hover:scale-95 transition-transform duration-500">
+                        <div class="bg-white/5 rounded border border-white/10 p-4 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500 delay-75">
+                            <div class="w-8 h-8 rounded-full bg-white/10 mb-2"></div>
+                            <div class="w-full h-1 bg-white/10 rounded"></div>
+                        </div>
+                        <div class="bg-primary/20 rounded border border-primary/30 p-4 transform -translate-y-4 group-hover:translate-y-0 transition-transform duration-500 delay-100">
+                            <div class="w-8 h-8 rounded-full bg-primary mb-2"></div>
+                            <div class="w-full h-1 bg-white/10 rounded"></div>
+                        </div>
+                        <div class="bg-white/5 rounded border border-white/10 p-4 col-span-2 transform translate-y-8 group-hover:translate-y-0 transition-transform duration-500 delay-150">
+                            <div class="flex space-x-2">
+                                <div class="w-1/2 h-20 bg-black/40 rounded"></div>
+                                <div class="w-1/2 h-20 bg-black/40 rounded border border-dashed border-white/20"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <img class="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-overlay pointer-events-none" data-alt="Dark 3D geometric shapes representing structure and logic" src="https://lh3.googleusercontent.com/aida-public/AB6AXuARrIFAGmnCuTcvLICJLSgETf1Q1AYXTXNtngVM7lxVXIPaR0KpZ4aVjQWTnlFgsxq1dQbCl2P3J5z58aUM_6gcL7BxKTH_FNle4n-Kze_N3wapNwqyCVd6HhgTdUxmheNWGCId2_e6T00JXPlKyPRqvNFlENtzTmLBJVNLFG5FLIHzUecLeoFwyO612-ciW6m_RkuHEPjk1hYSHrYQDM5rdfY9DVNQ-9zaXbxeyi8VrVjgxDPWxYDNyTJgaz1umxinHR6XvnlyFQ"/>
+            </div>
+        </div>
+    </section>
+</div>
+</div>
+<section class="w-full mb-40 relative z-30 bg-background-dark py-20">
+<div class="mb-20 text-center">
+<h2 class="text-5xl md:text-6xl font-bold tracking-tighter mb-4">SYSTEM <span class="text-gray-600">CAPABILITIES</span></h2>
+<div class="w-24 h-1 bg-primary mx-auto mb-8"></div>
+<p class="text-gray-400 max-w-xl mx-auto font-light">Engineered for speed, built for permanence. The underlying architecture.</p>
+</div>
+<div id="features-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div class="group relative bg-[#0a0a0a] border border-white/5 hover:border-primary/50 transition-colors duration-500 rounded-2xl p-8 h-[400px] flex flex-col overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none"></div>
+<div class="relative z-10 flex flex-col h-full">
+<div class="flex justify-between items-start mb-6">
+<span class="material-icons text-primary text-3xl">sync_alt</span>
+<span class="text-[10px] font-mono text-primary border border-primary/30 px-2 py-1 rounded bg-primary/10">SOCKET.IO</span>
+</div>
+<h3 class="text-2xl font-bold mb-2">Real-time Sync</h3>
+<p class="text-gray-500 text-sm leading-relaxed mb-8">Millisecond latency updates across all connected clients. Conflict-free replicated data types ensure consistency.</p>
+<div class="flex-1 w-full bg-black/50 border border-white/10 rounded-lg relative overflow-hidden flex items-center justify-center">
+<div class="absolute w-full h-full opacity-30 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDIwIDIwIiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMSI+PHBhdGggZD0iTTAgMjBMMjAgME0xMCAyMEwzMCAwIi8+PC9zdmc+')]"></div>
+<div class="flex space-x-4">
+<div class="w-2 h-16 bg-white/20 rounded animate-pulse"></div>
+<div class="w-2 h-16 bg-primary rounded animate-pulse delay-75"></div>
+<div class="w-2 h-16 bg-white/20 rounded animate-pulse delay-150"></div>
+</div>
+</div>
+</div>
+</div>
+<div class="group relative bg-[#0a0a0a] border border-white/5 hover:border-primary/50 transition-colors duration-500 rounded-2xl p-8 h-[400px] flex flex-col overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none"></div>
+<div class="relative z-10 flex flex-col h-full">
+<div class="flex-1 w-full bg-black/50 border border-white/10 rounded-lg relative overflow-hidden flex">
+                                    <div class="w-3/4 bg-[#111] border border-white/10 p-3 rounded shadow-xl transform group-hover:-translate-y-1 transition-transform">
+                                        <input type="text" id="slash-command-input" 
+                                               class="w-full bg-transparent text-gray-400 font-mono text-xs focus:text-white placeholder-gray-600 focus:outline-none mb-2" 
+                                               placeholder="Type 'new page'..." autocomplete="off">
+                                        <div class="flex flex-col space-y-1 pointer-events-none opacity-50">
+                                            <div class="h-6 bg-white/5 w-full rounded flex items-center px-2 text-xs text-gray-400"><span class="mr-2 text-primary">/</span> Commands</div>
+                                            <div class="h-6 bg-white/5 w-full rounded flex items-center px-2 text-xs text-gray-400"><span class="mr-2 text-primary">img</span> Image</div>
+                                        </div>
+                                    </div>
+</div>
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-2xl font-bold">Slash Commands</h3>
+<span class="material-icons text-gray-600 group-hover:text-primary transition-colors">bolt</span>
+</div>
+<p class="text-gray-500 text-sm leading-relaxed mb-4">Keyboard-first navigation. Execute complex formatting, insert media, or trigger integrations without leaving the home row.</p>
+<span class="text-[10px] font-mono text-gray-600 uppercase tracking-widest self-start">Context Aware</span>
+</div>
+</div>
+<div class="group relative bg-[#0a0a0a] border border-white/5 hover:border-primary/50 transition-colors duration-500 rounded-2xl p-8 h-[400px] flex flex-col overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none"></div>
+<div class="relative z-10 flex flex-col h-full">
+<div class="flex justify-between items-start mb-6">
+<span class="material-icons text-primary text-3xl">image</span>
+<span class="text-[10px] font-mono text-primary border border-primary/30 px-2 py-1 rounded bg-primary/10">CDN EDGE</span>
+</div>
+<h3 class="text-2xl font-bold mb-2">Drag &amp; Drop</h3>
+<p class="text-gray-500 text-sm leading-relaxed mb-8">Seamless media integration. Automatic optimization and CDN distribution for instant loading worldwide.</p>
+<div class="flex-1 w-full bg-black/50 border border-white/10 rounded-lg relative overflow-hidden flex items-center justify-center">
+<div class="w-32 h-20 border-2 border-dashed border-gray-600 rounded flex items-center justify-center group-hover:border-primary transition-colors">
+<span class="material-icons text-gray-600 group-hover:text-primary animate-bounce">upload</span>
+</div>
+</div>
+</div>
+</div>
+<div class="group relative bg-[#0a0a0a] border border-white/5 hover:border-primary/50 transition-colors duration-500 rounded-2xl p-8 h-[400px] flex flex-col overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none"></div>
+<div class="relative z-10 flex flex-col h-full">
+<div class="flex-1 w-full bg-black/50 border border-white/10 rounded-lg relative overflow-hidden flex items-center justify-center mb-8">
+<div class="grid grid-cols-2 gap-2 transform rotate-12 group-hover:rotate-0 transition-transform duration-500">
+<div class="w-12 h-16 bg-[#222] rounded border border-white/10"></div>
+<div class="w-12 h-16 bg-white rounded border border-gray-300"></div>
+<div class="w-12 h-16 bg-[#1a1a1a] rounded border border-primary/50"></div>
+<div class="w-12 h-16 bg-primary rounded border border-white/20"></div>
+</div>
+</div>
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-2xl font-bold">Adaptive Theming</h3>
+<span class="material-icons text-gray-600 group-hover:text-primary transition-colors">palette</span>
+</div>
+<p class="text-gray-500 text-sm leading-relaxed mb-4">Tailor the environment to your retinal comfort. System-sync or custom overrides for deep work sessions.</p>
+<span class="text-[10px] font-mono text-gray-600 uppercase tracking-widest self-start">CSS Variables</span>
+</div>
+</div>
+<div class="group relative bg-[#0a0a0a] border border-white/5 hover:border-primary/50 transition-colors duration-500 rounded-2xl p-8 h-[400px] flex flex-col overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none"></div>
+<div class="relative z-10 flex flex-col h-full">
+<div class="flex justify-between items-start mb-6">
+<span class="material-icons text-primary text-3xl">save</span>
+<span class="text-[10px] font-mono text-primary border border-primary/30 px-2 py-1 rounded bg-primary/10">POSTGRESQL</span>
+</div>
+<h3 class="text-2xl font-bold mb-2">Smart Auto-Save</h3>
+<p class="text-gray-500 text-sm leading-relaxed mb-8">Never lose a thought. Granular version history allows you to rewind time and fork ideas from any point.</p>
+<div class="flex-1 w-full bg-black/50 border border-white/10 rounded-lg relative overflow-hidden flex items-center justify-center">
+<div class="relative w-full px-8">
+<div class="h-1 bg-gray-800 rounded w-full overflow-hidden">
+<div class="h-full bg-primary w-1/3 animate-[shimmer_2s_infinite]"></div>
+</div>
+<div class="mt-2 flex justify-between text-[10px] font-mono text-gray-600">
+<span>v1.2</span>
+<span>Now</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="group relative bg-[#0a0a0a] border border-white/5 hover:border-primary/50 transition-colors duration-500 rounded-2xl p-8 h-[400px] flex flex-col overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none"></div>
+<div class="relative z-10 flex flex-col h-full">
+<div class="flex-1 w-full bg-black/50 border border-white/10 rounded-lg relative overflow-hidden flex items-center justify-center mb-8">
+<span class="material-icons text-6xl text-white/5 group-hover:text-primary/20 transition-colors">verified_user</span>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="w-16 h-16 border border-primary/30 rounded-full animate-ping opacity-20"></div>
+</div>
+</div>
+<div class="flex justify-between items-start mb-2">
+<h3 class="text-2xl font-bold">Military Grade</h3>
+<span class="material-icons text-gray-600 group-hover:text-primary transition-colors">lock</span>
+</div>
+<p class="text-gray-500 text-sm leading-relaxed mb-4">End-to-end encryption for private rooms. Role-based access control ensuring your intellectual property stays yours.</p>
+<span class="text-[10px] font-mono text-gray-600 uppercase tracking-widest self-start">AES-256</span>
+</div>
+</div>
+</div>
+</section>
+<section class="w-full max-w-4xl mx-auto mb-32 text-center px-4">
+<span class="inline-block py-1 px-3 rounded border border-primary/30 bg-primary/5 text-primary text-xs font-mono mb-6 uppercase tracking-widest">The Philosophy</span>
+<h2 class="text-3xl md:text-5xl font-bold leading-tight mb-8">
+                We stripped away the <span class="text-gray-500 line-through decoration-primary">clutter</span> to reveal the <span class="text-white">essence</span>.
+            </h2>
+<p class="text-xl text-gray-400 font-light leading-relaxed">
+                Your Space isn't just a text editor. It's a sanctuary for your mind. In a world screaming for your attention, we offer the luxury of silence and the power of connection only when you choose it. 
+                <span class="text-white font-normal">Reclaim your cognitive sovereignty.</span>
+</p>
+</section>
+<section class="w-full py-20 text-center relative overflow-hidden rounded-3xl border border-white/5 bg-white/[0.02]">
+<div class="absolute inset-0 bg-gradient-to-t from-primary/10 to-transparent opacity-50"></div>
+<h3 class="relative text-3xl md:text-5xl font-bold mb-8">Ready to define <span class="text-white/50">the new standard?</span></h3>
+<button class="relative bg-white text-black hover:bg-gray-200 px-8 py-4 rounded-full font-bold text-lg transition-all transform hover:scale-105 hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+                Start Writing Now
+            </button>
+<div class="mt-20 flex justify-center space-x-8 text-xs text-gray-600 uppercase tracking-widest">
+<a class="hover:text-primary transition-colors" href="#">Privacy</a>
+<a class="hover:text-primary transition-colors" href="#">Terms</a>
+<a class="hover:text-primary transition-colors" href="#">Twitter</a>
+</div>
+</section>
+</main>
+<div class="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+    <nav class="bg-black/80 backdrop-blur-xl border border-white/10 rounded-full px-6 py-3 shadow-2xl flex items-center space-x-8">
+        <!-- Feature 1: Frictionless Flow State -->
+        <a href="#feature-1" class="group flex flex-col items-center justify-center w-10 relative" title="Frictionless Flow State">
+            <span class="material-icons text-white/50 group-hover:text-primary transition-colors text-xl mb-1">bolt</span>
+            <span class="w-1 h-1 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></span>
+        </a>
+
+        <div class="w-px h-6 bg-white/10"></div>
+
+        <!-- Create Button (Redirects to Dashboard) -->
+        <!-- Create Button (Redirects to Dashboard) -->
+        <a href="/dashboard" class="group relative flex items-center justify-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] hover:bg-white/10 rounded-full p-2 hover:pl-4 hover:pr-4" title="Create New">
+            <div class="absolute inset-0 bg-primary/20 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <span class="material-icons text-white group-hover:text-primary transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:rotate-90 text-3xl drop-shadow-lg">add_circle</span>
+            <span class="max-w-0 group-hover:max-w-[100px] overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] text-primary font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 ml-0 group-hover:ml-2 text-sm tracking-widest uppercase">Create</span>
+        </a>
+
+        <div class="w-px h-6 bg-white/10"></div>
+
+        <!-- Feature 2: Deep Logic -->
+        <a href="#feature-2" class="group flex flex-col items-center justify-center w-12 relative" title="Deep Logic">
+            <span class="material-icons text-white/50 group-hover:text-primary transition-colors text-xl mb-1">psychology</span>
+            <span class="w-1 h-1 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></span>
+        </a>
+    </nav>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Scroll Animation
+        const editor = document.getElementById('editor-window');
+        
+        if(editor) {
+            editor.style.transform = `perspective(1000px) rotateX(20deg) scale(0.9)`;
+            document.addEventListener('scroll', () => {
+                const scrollY = window.scrollY;
+                const progress = Math.min(scrollY / 400, 1);
+                const tilt = 20 * (1 - progress);
+                const scale = 0.9 + (0.1 * progress);
+                editor.style.transform = `perspective(1000px) rotateX(${tilt}deg) scale(${scale})`;
+            });
+        }
+
+        // Dual User Typing Simulation
+        class Typer {
+            constructor(elementId, text, startDelay, typingSpeed) {
+                this.element = document.getElementById(elementId);
+                this.text = text;
+                this.startDelay = startDelay;
+                this.speed = typingSpeed;
+                this.index = 0;
+                this.isDeleting = false;
+                this.loop();
+            }
+
+            loop() {
+                const currentText = this.isDeleting 
+                    ? this.text.substring(0, this.index - 1) 
+                    : this.text.substring(0, this.index + 1);
+
+                this.element.textContent = currentText;
+
+                if (!this.isDeleting) this.index++;
+                else this.index--;
+
+                let typeSpeed = this.speed + Math.random() * 50;
+
+                if (this.isDeleting) typeSpeed /= 2;
+
+                if (!this.isDeleting && this.index === this.text.length) {
+                    typeSpeed = 2000; // Pause at end
+                    this.isDeleting = true;
+                } else if (this.isDeleting && this.index === 0) {
+                    this.isDeleting = false;
+                    typeSpeed = 1000; // Pause before restarting
+                }
+
+                setTimeout(() => this.loop(), typeSpeed);
+            }
+        }
+
+        setTimeout(() => new Typer('sarah-text', 'living, breathing entity that adapts to your thoughts.', 0, 100), 1000);
+        setTimeout(() => new Typer('alex-text', 'We are building together in real-time.', 1500, 120), 2000);
+
+        // Feature Cards Scroll Reveal
+        const featureGrid = document.getElementById('features-grid');
+        if (featureGrid) {
+            const cards = featureGrid.children;
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('in-view');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.15 });
+
+            Array.from(cards).forEach((card, index) => {
+                card.style.transitionDelay = `${index * 100}ms`;
+                observer.observe(card);
+            });
+        }
+
+        // Stacking Cards Effect
+        const stackContainer = document.getElementById('stacking-container');
+        const card1 = document.getElementById('feature-1');
+        const card2 = document.getElementById('feature-2');
+        const editorWindow = document.getElementById('editor-window');
+
+        // Navigation Scroll Fix
+        const navLink1 = document.querySelector('a[href="#feature-1"]');
+        const navLink2 = document.querySelector('a[href="#feature-2"]');
+
+        if (stackContainer && navLink1 && navLink2) {
+            navLink1.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetY = stackContainer.getBoundingClientRect().top + window.scrollY;
+                window.scrollTo({ top: targetY, behavior: 'smooth' });
+            });
+
+            navLink2.addEventListener('click', (e) => {
+                e.preventDefault();
+                // Scroll to where the second card enters fully (100vh down from start of container)
+                const targetY = stackContainer.getBoundingClientRect().top + window.scrollY + window.innerHeight;
+                window.scrollTo({ top: targetY, behavior: 'smooth' });
+            });
+        }
+
+        // Slash Command Functionality
+        const slashInput = document.getElementById('slash-command-input');
+        if (slashInput) {
+            slashInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    const val = slashInput.value.toLowerCase();
+                    // Check for keywords or basic command
+                    if (val.includes('new') || val.includes('page') || val.includes('create') || val.includes('dashboard') || val.trim() === '/') {
+                        // Visual feedback
+                        slashInput.classList.remove('text-gray-400');
+                        slashInput.classList.add('text-green-400');
+                        
+                        // Redirect
+                        setTimeout(() => {
+                            window.location.href = '/dashboard';
+                        }, 300);
+                    } else {
+                        // Error shake
+                        slashInput.classList.add('animate-pulse', 'text-red-400');
+                        setTimeout(() => slashInput.classList.remove('animate-pulse', 'text-red-400'), 500);
+                    }
+                }
+            });
+        }
+
+        // Hero Input Functionality
+        const heroInput = document.getElementById('hero-input');
+        const heroButton = document.getElementById('hero-button');
+        let heroTimeout;
+        
+        function handleHeroCommand() {
+             const originalVal = heroInput.value;
+             const val = originalVal.toLowerCase();
+             
+             // Check for keywords or basic command
+             if (val.includes('join') || val.includes('room') || val.includes('new') || val.includes('draft') || val.trim() === 'create') {
+                 // Visual feedback
+                 heroInput.classList.add('text-green-400');
+                 
+                 // Redirect
+                 setTimeout(() => {
+                     window.location.href = '/dashboard';
+                 }, 300);
+             } else {
+                 // Error Feedback
+                 heroInput.classList.add('text-red-500');
+                 heroInput.value = 'Unknown command';
+                 heroInput.parentElement.style.borderColor = 'red';
+                 
+                 // Shake animation
+                 heroInput.parentElement.classList.add('animate-shake');
+                 setTimeout(() => heroInput.parentElement.classList.remove('animate-shake'), 500);
+
+                 // Reset after delay
+                 clearTimeout(heroTimeout);
+                 heroTimeout = setTimeout(() => {
+                     heroInput.classList.remove('text-red-500');
+                     heroInput.parentElement.style.borderColor = 'rgba(255,255,255,0.1)';
+                     heroInput.value = originalVal;
+                 }, 2000);
+             }
+        }
+
+        if (heroInput && heroButton) {
+            heroInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') handleHeroCommand();
+                // Clear error state on typing
+                if (heroInput.classList.contains('text-red-500')) {
+                    globalThis.clearTimeout(heroTimeout);
+                    heroInput.classList.remove('text-red-500');
+                    heroInput.parentElement.style.borderColor = 'rgba(255,255,255,0.1)';
+                    if(heroInput.value === 'Unknown command') heroInput.value = '';
+                }
+            });
+            heroButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                handleHeroCommand();
+            });
+        }
+
+        if (stackContainer && card1 && card2) {
+            window.addEventListener('scroll', () => {
+                const windowHeight = window.innerHeight;
+                
+                // --- ENTRY ANIMATION FOR CARD 1 ---
+                const rect1 = card1.getBoundingClientRect();
+                // rect1.top represents the position of the top of Card 1 relative to viewport.
+                // When rect1.top > 0, it is pushing up from the bottom or sticking (if sticky).
+                // Actually, with sticky, rect1.top will be >= 0 until it's pushed by next content or container end.
+                // We want it to scale up as it enters the viewport (from bottom to top=0).
+                
+                // When container top enters viewport, rect1.top starts decreasing from windowHeight.
+                // We want scale 0.8 at bottom, 1.0 at top.
+                
+                // However, `sticky` complicates `rect1.top` because it stays at 0.
+                // We need to check the container's position or the element's position before it sticks?
+                // Actually, `getBoundingClientRect` returns the *visual* position.
+                // So as we scroll down, rect1.top goes from windowHeight -> 0.
+                if (rect1.top > 0 && rect1.top <= windowHeight) {
+                     const progress1 = 1 - (rect1.top / windowHeight); // 0 to 1
+                     const scale1 = 0.8 + (progress1 * 0.2); // 0.8 -> 1.0
+                     const opacity1 = 0.5 + (progress1 * 0.5); // 0.5 -> 1.0
+                     
+                     // Only apply if we are NOT being covered by card 2 yet.
+                     // But card 2 logic handles the *exit* of card 1.
+                     // We need to merge them.
+                     
+                     // Priority: If Card 2 is entering, that logic takes precedence for Card 1 (exit).
+                     // If Card 2 is NOT entering (rect2.top > windowHeight), then we are in Entry phase.
+                     const rect2 = card2.getBoundingClientRect();
+                     if (rect2.top > windowHeight) {
+                         card1.style.transform = `scale(${scale1})`;
+                         card1.style.opacity = `${opacity1}`;
+                         card1.style.filter = 'none';
+                         
+                         // --- EDITOR EXIT ANIMATION ---
+                         // As Card 1 enters (slides over editor), blur and scale down editor.
+                         if (editorWindow) {
+                             const editorScale = 1 - (progress1 * 0.1); // 1.0 -> 0.9
+                             const editorBlur = progress1 * 8; // 0 -> 8px
+                             const editorOpacity = 1 - (progress1 * 0.5); // 1.0 -> 0.5
+                             
+                             editorWindow.style.transform = `scale(${editorScale})`;
+                             editorWindow.style.filter = `blur(${editorBlur}px)`;
+                             editorWindow.style.opacity = `${editorOpacity}`;
+                         }
+                     }
+                } else if (rect1.top > windowHeight) {
+                     // Cleanup: Reset editor if we scroll back up (card below viewport)
+                     if (editorWindow) {
+                         editorWindow.style.transform = 'none';
+                         editorWindow.style.filter = 'none';
+                         editorWindow.style.opacity = '1';
+                     }
+                } else if (rect1.top <= 0) {
+                     // It is stuck at top. Check Card 2 for exit animation.
+                     const rect2 = card2.getBoundingClientRect();
+                     const distance2 = rect2.top;
+                     
+                     if (distance2 <= windowHeight && distance2 >= 0) {
+                        // Card 2 entering -> Card 1 exiting (scaling down)
+                        const progress2 = 1 - (distance2 / windowHeight);
+                        // Force blur update regardless of screen size for verification
+                        const targetScale = 1 - (progress2 * 0.1); // 1.0 -> 0.9
+                        const targetOpacity = 1; // Keep opaque
+                        const targetBlur = progress2 * 30; // 30px blur for MAXIMUM VISIBILITY
+                        
+                        card1.style.transform = `scale(${targetScale})`;
+                        card1.style.opacity = `${targetOpacity}`;
+                        card1.style.filter = `blur(${targetBlur}px)`;
+                     } else if (distance2 > windowHeight) {
+                        // Card 1 is stuck, Card 2 hasn't entered yet.
+                        // Ensure Card 1 is fully visible.
+                        // Also check if we scrolled back up from being blurred
+                        card1.style.transform = 'scale(1)';
+                        card1.style.opacity = '1';
+                        card1.style.filter = 'none';
+                     }
+                }
+            });
+        }
+    });
+</script>
+</body></html>
