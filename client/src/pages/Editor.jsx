@@ -448,9 +448,7 @@ export default function Editor() {
     }
   };
 
-        }
-    }
-  };
+
 
   const handleNameSubmit = (e) => {
     e.preventDefault();
