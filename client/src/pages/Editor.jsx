@@ -363,7 +363,8 @@ export default function Editor() {
 
     try {
       // Use relative path to leverage Vite proxy
-      const res = await axios.post('/api/upload', formData, {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await axios.post(`${apiUrl}/api/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       // console.log('Upload success:', res.data);
