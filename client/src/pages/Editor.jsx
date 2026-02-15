@@ -11,6 +11,7 @@ import getCaretCoordinates from 'textarea-caret';
 import axios from 'axios';
 import ImageLayer from '../components/ImageLayer';
 import DiffMatchPatch from 'diff-match-patch';
+import * as Y from 'yjs';
 
 const dmp = new DiffMatchPatch();
 
@@ -47,9 +48,16 @@ export default function Editor() {
   const [nameInput, setNameInput] = useState('');
   
   const textareaRef = useRef(null);
-  const isRemoteUpdate = useRef(false);
   const saveTimerRef = useRef(null);
-  const cursorTimerRef = useRef(null);
+  const contentRef = useRef(content); // Track latest content for diffing
+  
+  // Yjs References
+  const ydocRef = useRef(null);
+
+  // Keep contentRef in sync
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   // Connect socket and join document
   useEffect(() => {
@@ -65,52 +73,50 @@ export default function Editor() {
       socket.connect();
     }
 
+    // Initialize Yjs Doc
+    const ydoc = new Y.Doc();
+    ydocRef.current = ydoc;
+    const ytext = ydoc.getText('codemirror');
+
+    // Handle Yjs local updates -> Socket
+    ydoc.on('update', (update, origin) => {
+        if (origin !== 'remote') {
+            socket.emit('sync-update', update);
+        }
+    });
+
+    // Handle Yjs remote updates -> Local State
+    ytext.observe((event) => {
+        if (event.transaction.origin === 'remote') {
+            const newText = ytext.toString();
+            setContent(newText);
+            setCharCount(newText.length);
+            setWordCount(countWords(newText));
+        }
+    });
+
     socket.emit('join-document', {
       shortId,
       guestId: getGuestId(),
       userName: name
     });
 
-    // Listen for document content
-    const handleDocumentLoaded = ({ content: docContent, title: docTitle, images: docImages }) => {
-      setContent(docContent || '');
+    // Listen for Yjs sync updates
+    const handleSyncUpdate = (update) => {
+        try {
+            Y.applyUpdate(ydoc, new Uint8Array(update), 'remote');
+            setIsLoading(false);
+        } catch (e) {
+            console.error('Yjs sync error:', e);
+        }
+    };
+    
+    // Listen for document metadata (title, images, initial content fallback)
+    const handleDocumentMetadata = ({ title: docTitle, images: docImages }) => {
       setTitle(docTitle || 'Untitled');
       setImages(docImages || []);
-      setCharCount(docContent?.length || 0);
-      setWordCount(countWords(docContent || ''));
-      setIsLoading(false);
-    };
-
-    // Listen for remote text changes — also update cursor position atomically
-    const handleTextChange = ({ content: newContent, patches, cursorPosition, selectionEnd, userId, userInfo }) => {
-      isRemoteUpdate.current = true;
-      
-      let finalContent = newContent;
-
-      if (patches) {
-        // Apply patches to current local content
-        // dmp.patch_fromText parses the text format
-        const patchList = dmp.patch_fromText(patches);
-        const [patchedText] = dmp.patch_apply(patchList, content);
-        finalContent = patchedText;
-      }
-      
-      setContent(finalContent);
-      setCharCount(finalContent.length);
-      setWordCount(countWords(finalContent));
-
-      // Update remote cursor from the same event to keep position & content in sync
-      if (userId && cursorPosition != null) {
-        setRemoteCursors(prev => ({
-          ...prev,
-          [userId]: {
-            position: cursorPosition,
-            selectionEnd: selectionEnd, // Update selectionEnd
-            userInfo: userInfo || prev[userId]?.userInfo,
-            lastUpdate: Date.now()
-          }
-        }));
-      }
+      // Content is handled by Yjs sync, but if we wanted to be sure...
+      // actually Yjs sync handles content.
     };
 
     // Listen for remote title changes
@@ -131,7 +137,7 @@ export default function Editor() {
       }));
     };
 
-    // Listen for user leaving — remove their cursor
+    // Listen for user leaving
     const handleUserLeft = ({ userId }) => {
       setRemoteCursors(prev => {
         const next = { ...prev };
@@ -140,8 +146,9 @@ export default function Editor() {
       });
     };
 
-    socket.on('document-loaded', handleDocumentLoaded);
-    socket.on('text-change', handleTextChange);
+    // Clean up handle
+    socket.on('sync-update', handleSyncUpdate);
+    socket.on('document-metadata', handleDocumentMetadata);
     socket.on('title-change', handleTitleChange);
     socket.on('presence-update', handlePresenceUpdate);
     socket.on('cursor-move', handleCursorMove);
@@ -162,13 +169,14 @@ export default function Editor() {
     });
 
     return () => {
-      socket.off('document-loaded', handleDocumentLoaded);
-      socket.off('text-change', handleTextChange);
+      socket.off('sync-update', handleSyncUpdate);
+      socket.off('document-metadata', handleDocumentMetadata);
       socket.off('title-change', handleTitleChange);
       socket.off('presence-update', handlePresenceUpdate);
       socket.off('cursor-move', handleCursorMove);
       socket.off('user-left', handleUserLeft);
       socket.off('image-update');
+      ydoc.destroy();
     };
   }, [shortId]);
 
@@ -198,67 +206,67 @@ export default function Editor() {
     if (!textareaRef.current || !shortId) return;
     const { selectionStart, selectionEnd } = textareaRef.current;
 
-    // Update local selection immediately
     if (selectionStart !== selectionEnd) {
       setLocalSelection({ start: selectionStart, end: selectionEnd });
     } else {
       setLocalSelection(null);
     }
 
-    // Set pending cursor state
-    pendingCursorRef.current = { position: selectionStart, selectionEnd };
-    // Removed localSelection logic from original
-
-    // Removed pendingCursorRef and debouncing logic from original
     socket.emit('cursor-move', { shortId, position: selectionStart, selectionEnd });
-  }, [shortId, socket]); // Added socket to dependencies
+  }, [shortId, socket]);
 
-  // Handle local text changes with debounced emit
+  // Handle local text changes
   const handleContentChange = useCallback((e) => {
     const newContent = e.target.value;
+    const currentContent = contentRef.current;
     
-    // Calculate patches (diff) from previous content to new content
-    const patchList = dmp.patch_make(content, newContent);
-    const patches = dmp.patch_toText(patchList);
+    if (!ydocRef.current) return;
+    const ytext = ydocRef.current.getText('codemirror');
+    
+    // Calculate Diff
+    const diffs = dmp.diff_main(currentContent, newContent);
+    dmp.diff_cleanupSemantic(diffs);
+    
+    // Apply diffs to Y.Text
+    ydocRef.current.transact(() => {
+        let index = 0;
+        diffs.forEach(([op, text]) => {
+            if (op === 0) { // Equal
+                index += text.length;
+            } else if (op === -1) { // Delete
+                ytext.delete(index, text.length);
+            } else if (op === 1) { // Insert
+                ytext.insert(index, text);
+                index += text.length;
+            }
+        });
+    });
 
     setContent(newContent);
     setCharCount(newContent.length);
     setWordCount(countWords(newContent));
     
-    // Set saving status
+    // Set saving status (Visual only, sync handles save)
     setSaveStatus('saving');
-    
-    // Clear previous timer
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    
-    // Set timer to switch to 'saved'
     saveTimerRef.current = setTimeout(() => {
       setSaveStatus('saved');
     }, 1000);
 
-    // Emit change to server (send both full content and patches)
-    socket.emit('text-change', {
-      shortId,
-      content: newContent,
-      patches: patches,
-      cursorPosition: e.target.selectionStart,
-      selectionEnd: e.target.selectionEnd
-    });
-  }, [shortId, socket, content]); // Needs 'content' to calc diff
+  }, [shortId]); // Removed 'socket' and 'content' dependencies, using refs
 
   // Handle title changes
   const handleTitleChange = useCallback((newTitle) => {
     setTitle(newTitle);
     socket.emit('title-change', { shortId, title: newTitle });
-  }, [shortId, socket]); // Added socket to dependencies
+  }, [shortId]);
 
   // Auto-focus textarea
   useEffect(() => {
-    // Original had isLoading, now using status
-    if (status === 'connected' && textareaRef.current) {
+    if (!isLoading && textareaRef.current) {
       textareaRef.current.focus();
     }
-  }, [status]);
+  }, [isLoading]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -271,12 +279,10 @@ export default function Editor() {
         return;
       }
 
-      // Ctrl/Cmd + S to manual save
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
       }
       
-      // Toggle Preview with Ctrl/Cmd + P
       if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
         e.preventDefault();
         setIsPreview(prev => !prev);
@@ -284,28 +290,23 @@ export default function Editor() {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedImageId]); // Depends on selectedImageId
-
-  // ... (handleTextareaKeyDown is separate)
+  }, [selectedImageId]);
 
   // Image Update Handler for ImageLayer
   const handleImageUpdate = useCallback((id, updates) => {
      if (!socket) return;
      if (updates === null) {
-        // Delete
         setImages(prev => prev.filter(i => i.id !== id));
         socket.emit('image-update', { shortId, image: { id }, action: 'delete' });
      } else {
-        // Update
          setImages(prev => prev.map(img => img.id === id ? { ...img, ...updates } : img));
-         // Debounce this emit in real app, but for now:
          socket.emit('image-update', { shortId, image: { id, ...updates }, action: 'update' });
      }
   }, [socket, shortId]);
+
   // Handle Textarea specific keys (Slash command)
   const handleTextareaKeyDown = (e) => {
     if (slashMenu.isOpen) {
-      // Let SlashMenu handle navigation keys via its own listener
       if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter') {
           e.preventDefault();
@@ -317,14 +318,12 @@ export default function Editor() {
     if (e.key === '/') {
       const textarea = e.target;
       const { selectionStart } = textarea;
-      
-      // Calculate coordinates using textarea-caret
       const caret = getCaretCoordinates(textarea, selectionStart);
       
       setSlashMenu({
         isOpen: true,
         position: { 
-          top: caret.top + caret.height, // Position below the cursor line
+          top: caret.top + caret.height,
           left: caret.left 
         }
       });
@@ -345,57 +344,59 @@ export default function Editor() {
     
     const insertText = typeof cmd.value === 'function' ? cmd.value() : cmd.value;
     
-    // Insert text
     const newValue = textBefore + insertText + textAfter;
     
-    // Update content
+    // Manual Update for Slash Command (mimic handleContentChange logic)
+    if (ydocRef.current) {
+        const ytext = ydocRef.current.getText('codemirror');
+        // Simple replace for slash command efficiency? Or use dmp?
+        // Let's use dmp to be consistent and safe
+        const diffs = dmp.diff_main(contentRef.current, newValue);
+        dmp.diff_cleanupSemantic(diffs);
+        ydocRef.current.transact(() => {
+            let index = 0;
+            diffs.forEach(([op, text]) => {
+                if (op === 0) index += text.length;
+                else if (op === -1) ytext.delete(index, text.length);
+                else if (op === 1) { ytext.insert(index, text); index += text.length; }
+            });
+        });
+    }
+
     setContent(newValue);
     setSlashMenu({ isOpen: false, position: null });
     
-    // Update cursor, focus, emit change...
     setTimeout(() => {
       textarea.focus();
       
-      // Calculate new cursor position
       let newCursorPos = textBefore.length + insertText.length;
       let selectionEnd = newCursorPos;
       
       if (cmd.id === 'bold' || cmd.id === 'italic') {
         const offset = cmd.id === 'bold' ? 2 : 1;
-        const textLen = 4; // "text"
         newCursorPos = textBefore.length + offset;
-        selectionEnd = newCursorPos + textLen;
+        selectionEnd = newCursorPos + 4;
       } else if (cmd.id === 'code') {
-        newCursorPos = textBefore.length + 4; // ```\n
+        newCursorPos = textBefore.length + 4;
         selectionEnd = newCursorPos;
       }
       
       textarea.setSelectionRange(newCursorPos, selectionEnd);
-      
-      // Emit change
-       socket.emit('text-change', {
-        shortId,
-        content: newValue,
-        cursorPosition: newCursorPos,
-        selectionEnd: selectionEnd
-      });
+      // Cursor move emit handled by click/keyup/select listeners or next tick
+      socket.emit('cursor-move', { shortId, position: newCursorPos, selectionEnd });
     }, 0);
   };
 
-
   // Image Upload Handler
   const uploadImage = async (file, x, y) => {
-    // console.log('Uploading image...', file.name);
     const formData = new FormData();
     formData.append('image', file);
 
     try {
-      // Use relative path to leverage Vite proxy
       const apiUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || '';
       const res = await axios.post(`${apiUrl}/api/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      // console.log('Upload success:', res.data);
 
       const newImage = {
         id: Date.now() + '-' + Math.random().toString(36).substr(2, 9),
@@ -406,10 +407,7 @@ export default function Editor() {
         height: 'auto'
       };
 
-      // Optimistic update
       setImages(prev => [...prev, newImage]);
-      
-      // Emit to server
       socket.emit('image-update', { shortId, image: newImage, action: 'add' });
     } catch (err) {
       console.error('Upload failed', err);
@@ -417,26 +415,17 @@ export default function Editor() {
     }
   };
 
-  // Handle Paste (Images)
   const handlePaste = (e) => {
     const items = e.clipboardData.items;
-    let foundImage = false;
     for (let i = 0; i < items.length; i++) {
       if (items[i].type.indexOf('image') !== -1) {
         e.preventDefault();
-        foundImage = true;
         const file = items[i].getAsFile();
-        // Upload to a default position (center-ish)
-        // We can randomize slightly so they don't stack perfectly
         uploadImage(file, 200 + Math.random() * 50, 200 + Math.random() * 50); 
       }
     }
-    if (!foundImage) {
-        // console.log('No image found in paste');
-    }
   };
 
-  // Handle Drop (Images)
   const handleDrop = (e) => {
     e.preventDefault();
     const files = e.dataTransfer.files;
@@ -448,17 +437,11 @@ export default function Editor() {
     }
   };
 
-
-
   const handleNameSubmit = (e) => {
     e.preventDefault();
     if (nameInput.trim()) {
       localStorage.setItem('yourspace-username', nameInput.trim());
       setShowNameModal(false);
-      // Re-trigger effect will happen because we rely on state or we can manually connect
-      // Actually, relying on effect re-run is better if we add a dependency, 
-      // but simpler here: simply reload the page or call connect logic.
-      // Let's just reload to keep it clean and simple for this "gatekeeping" logic
       window.location.reload(); 
     }
   };
@@ -467,8 +450,6 @@ export default function Editor() {
      e.preventDefault(); 
   };
 
-  // Use document-level selectionchange for robust tracking
-  // This catches all selection updates (click inside, drag, arrow keys, etc.)
   useEffect(() => {
     const handleSelectionChange = () => {
       if (document.activeElement === textareaRef.current) {
@@ -478,8 +459,6 @@ export default function Editor() {
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
   }, [emitCursorPositionFull]);
-
-
 
   if (showNameModal) {
     return (
@@ -542,7 +521,6 @@ export default function Editor() {
         onTogglePreview={() => setIsPreview(!isPreview)}
       />
 
-      {/* Editor Container */}
       <div style={{
         flex: 1,
         maxWidth: '780px',
@@ -553,7 +531,6 @@ export default function Editor() {
         display: 'flex',
         flexDirection: 'column'
       }}>
-        {/* Remote Cursors Overlay - Only show in Edit mode */}
         {!isPreview && (
           <RemoteCursors
             cursors={remoteCursors}
@@ -562,7 +539,6 @@ export default function Editor() {
           />
         )}
         
-        {/* Image Layer - Overlay */}
         <ImageLayer 
             images={images} 
             onUpdate={handleImageUpdate} 
@@ -571,7 +547,6 @@ export default function Editor() {
             onSelect={setSelectedImageId}
         />
 
-        {/* Markdown Preview */}
         {isPreview ? (
           <div className="markdown-preview prose prose-invert max-w-none" style={{ padding: '0 0 3rem 0', minHeight: '50vh' }}>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -589,10 +564,10 @@ export default function Editor() {
               onClick={(e) => { emitCursorPositionFull(); setSelectedImageId(null); }}
               onSelect={(e) => { emitCursorPositionFull(); }}
               onKeyDown={handleTextareaKeyDown}
-              onPaste={handlePaste} // Added
-              onDrop={handleDrop} // Added
-              onDragOver={handleDragOver} // Added
-              placeholder={"Start typing or drop an image..."} // Updated placeholder
+              onPaste={handlePaste}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              placeholder={"Start typing or drop an image..."}
               spellCheck="true"
               autoFocus
             />
@@ -607,7 +582,6 @@ export default function Editor() {
         )}
       </div>
 
-      {/* Bottom status bar */}
       <div style={{
         position: 'fixed',
         bottom: 0,
@@ -626,7 +600,6 @@ export default function Editor() {
         <span>{wordCount.toLocaleString()} words</span>
       </div>
 
-      {/* Share Modal */}
       <ShareModal
         isOpen={showShare}
         onClose={() => setShowShare(false)}

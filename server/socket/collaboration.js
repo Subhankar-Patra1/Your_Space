@@ -1,12 +1,17 @@
 const prisma = require('../config/db');
+const Y = require('yjs');
 
 // Track active users per document room
 const activeUsers = new Map();
 
+// In-memory Yjs documents for active rooms
+// Map<shortId, Y.Doc>
+const activeDocs = new Map();
+
 // Debounce timers for auto-save per document
 const saveTimers = new Map();
 
-const SAVE_DEBOUNCE_MS = 1500;
+const SAVE_DEBOUNCE_MS = 2000;
 
 function setupCollaboration(io) {
   io.on('connection', (socket) => {
@@ -39,19 +44,53 @@ function setupCollaboration(io) {
         socket.join(shortId);
         addUserToRoom(shortId, socket.id, userInfo);
 
-        // Fetch document content
-        const doc = await prisma.document.findUnique({ where: { shortId } });
-        if (doc) {
-          socket.emit('document-loaded', {
-            content: doc.content,
-            title: doc.title,
-            images: doc.images || []
-          });
+        // Broadcast presence update
+        io.to(shortId).emit('presence-update', getActiveUsers(shortId));
+
+        // --- Yjs Sync Logic ---
+        // 1. Get or create Y.Doc for this room
+        let doc = activeDocs.get(shortId);
+        
+        if (!doc) {
+          doc = new Y.Doc();
+          activeDocs.set(shortId, doc);
+          
+          // Load content from DB into Y.Doc
+          const dbDoc = await prisma.document.findUnique({ where: { shortId } });
+          if (dbDoc && dbDoc.content) {
+             const ytext = doc.getText('codemirror');
+             if (ytext.toString() !== dbDoc.content) {
+                // Initialize Y.Doc with DB content if simpler
+                // Or just trust that if it's new memory doc, it receives DB content.
+                doc.transact(() => {
+                    ytext.delete(0, ytext.length);
+                    ytext.insert(0, dbDoc.content);
+                });
+             }
+             
+             // Also emit other metadata like title/images
+             socket.emit('document-metadata', {
+                title: dbDoc.title,
+                images: dbDoc.images || []
+             });
+          }
+        } else {
+             // For existing active doc, we might want to send metadata too if we haven't
+             const dbDoc = await prisma.document.findUnique({ where: { shortId } });
+             if (dbDoc) {
+                 socket.emit('document-metadata', {
+                    title: dbDoc.title,
+                    images: dbDoc.images || []
+                 });
+             }
         }
 
-        // Broadcast presence update to all users in the room
-        io.to(shortId).emit('presence-update', getActiveUsers(shortId));
-        
+        // 2. Send current document state to the new client
+        // Encode state as update
+        const stateVector = Y.encodeStateVector(doc);
+        const diff = Y.encodeStateAsUpdate(doc, stateVector);
+        socket.emit('sync-update', Buffer.from(diff));
+
         if (process.env.NODE_ENV !== 'production') {
           console.log(`📄 User ${socket.id} joined document: ${shortId}`);
         }
@@ -61,34 +100,53 @@ function setupCollaboration(io) {
       }
     });
 
-    // Handle text changes
-    socket.on('text-change', ({ shortId, content, patches, cursorPosition, selectionEnd }) => {
-      // Broadcast to other users in the room — include userInfo so cursor can be updated atomically
-      socket.to(shortId).emit('text-change', {
-        content,
-        patches,
-        cursorPosition,
-        selectionEnd,
-        userId: socket.id,
-        userInfo
-      });
+    // Handle Yjs Updates
+    socket.on('sync-update', (update) => {
+      const room = currentRoom;
+      if (!room) return;
 
-      // Debounced auto-save to database
-      debouncedSave(shortId, content);
+      const doc = activeDocs.get(room);
+      if (doc) {
+        // Apply update to server in-memory doc
+        try {
+            Y.applyUpdate(doc, new Uint8Array(update));
+        } catch(e) {
+            console.error("Error applying update", e);
+        }
+
+        // Broadcast update to ALL other clients in the room
+        socket.to(room).emit('sync-update', update);
+
+        // Schedule save to DB
+        debouncedSave(room, doc);
+      }
+    });
+    
+    // Also support getting full update if finding missing sync
+    socket.on('sync-step-1', (stateVector) => {
+        const room = currentRoom;
+        if(!room) return;
+        const doc = activeDocs.get(room);
+        if(doc) {
+            const diff = Y.encodeStateAsUpdate(doc, new Uint8Array(stateVector));
+            socket.emit('sync-update', Buffer.from(diff));
+        }
     });
 
-    // Handle Image Updates (Add, Move, Resize, Delete)
+    // Handle previous simple text-change? No, completely replace.
+    
+    // Handle Image Updates (Keep existing logic, independent of Yjs for now or integrate?)
+    // Integrating images into Yjs Map is better, but let's stick to the working ad-hoc solution for images 
+    // to minimize risk, unless requested. User asked for "OT/CRDT" which usually implies text.
+    // We will keep the image handlers as is.
     socket.on('image-update', async ({ shortId, image, action }) => {
-      // Broadcast to others
       socket.to(shortId).emit('image-update', { image, action });
       
-      // Persist to DB immediately (or debounce if frequent moves)
       try {
-        const doc = await prisma.document.findUnique({ where: { shortId } });
-        if (!doc) return;
+        const dbDoc = await prisma.document.findUnique({ where: { shortId } });
+        if (!dbDoc) return;
         
-        let images = doc.images || [];
-        // Ensure images is an array (Prisma Json might return it as is)
+        let images = dbDoc.images || [];
         if (!Array.isArray(images)) images = [];
         
         if (action === 'delete') {
@@ -114,17 +172,13 @@ function setupCollaboration(io) {
     // Handle title changes
     socket.on('title-change', ({ shortId, title }) => {
       socket.to(shortId).emit('title-change', { title, userId: socket.id });
-      
-      // Save title immediately
       prisma.document.update({
         where: { shortId },
         data: { title }
-      }).catch(err =>
-        console.error('Error saving title:', err)
-      );
+      }).catch(err => console.error('Error saving title:', err));
     });
 
-    // Handle cursor movements (for future enhancement)
+    // Handle cursor movements
     socket.on('cursor-move', ({ shortId, position, selectionEnd }) => {
       socket.to(shortId).emit('cursor-move', {
         userId: socket.id,
@@ -141,8 +195,25 @@ function setupCollaboration(io) {
       }
       if (currentRoom) {
         removeUserFromRoom(currentRoom, socket.id);
-        io.to(currentRoom).emit('presence-update', getActiveUsers(currentRoom));
+        const users = getActiveUsers(currentRoom);
+        io.to(currentRoom).emit('presence-update', users);
         io.to(currentRoom).emit('user-left', { userId: socket.id });
+        
+        // If room is empty, we could cleanup activeDocs.get(currentRoom), 
+        // but maybe keep it for a while for quick re-joins?
+        // For now, let's clean it up to save memory if empty.
+        if (users.length === 0) {
+             const doc = activeDocs.get(currentRoom);
+             if (doc) {
+                 // Final save
+                 saveToDB(currentRoom, doc).then(() => {
+                     if (getActiveUsers(currentRoom).length === 0) {
+                        doc.destroy();
+                        activeDocs.delete(currentRoom);
+                     }
+                 });
+             }
+        }
       }
     });
   });
@@ -171,20 +242,25 @@ function getActiveUsers(room) {
   return Array.from(activeUsers.get(room).values());
 }
 
-function debouncedSave(shortId, content) {
+async function saveToDB(shortId, doc) {
+    const content = doc.getText('codemirror').toString();
+    try {
+        await prisma.document.update({
+            where: { shortId },
+            data: { content, updatedAt: new Date() }
+        });
+    } catch (error) {
+        console.error(`Error saving document ${shortId}:`, error);
+    }
+}
+
+function debouncedSave(shortId, doc) {
   if (saveTimers.has(shortId)) {
     clearTimeout(saveTimers.get(shortId));
   }
 
   const timer = setTimeout(async () => {
-    try {
-      await prisma.document.update({
-        where: { shortId },
-        data: { content, updatedAt: new Date() }
-      });
-    } catch (error) {
-      console.error(`Error auto-saving document ${shortId}:`, error);
-    }
+    await saveToDB(shortId, doc);
     saveTimers.delete(shortId);
   }, SAVE_DEBOUNCE_MS);
 

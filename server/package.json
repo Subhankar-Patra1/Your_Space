@@ -14,7 +14,8 @@
     "express": "^4.21.2",
     "multer": "^2.0.2",
     "nanoid": "^5.0.9",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "yjs": "^13.6.29"
   },
   "devDependencies": {
     "nodemon": "^3.1.11",
