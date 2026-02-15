@@ -28,6 +28,7 @@ function getPreview(content, maxLen = 120) {
 export default function Dashboard() {
   const [notes, setNotes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
   const [noteToDelete, setNoteToDelete] = useState(null);
   const navigate = useNavigate();
   const guestId = getGuestId();
@@ -52,6 +53,7 @@ export default function Dashboard() {
   }, [guestId]);
 
   const handleCreateNew = async () => {
+    setIsCreating(true);
     try {
       const apiUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || '';
       const res = await fetch(`${apiUrl}/api/documents`, {
@@ -63,6 +65,7 @@ export default function Dashboard() {
       navigate(`/note/${data.shortId}`);
     } catch (error) {
       console.error('Failed to create note:', error);
+      setIsCreating(false);
     }
   };
 
@@ -117,12 +120,21 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <button className="btn-primary" onClick={handleCreateNew}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            New Note
+          <button className="btn-primary" onClick={handleCreateNew} disabled={isCreating}>
+            {isCreating ? (
+              <>
+                <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2, borderTopColor: 'var(--accent-content)', borderRightColor: 'rgba(255,255,255,0.2)', borderBottomColor: 'rgba(255,255,255,0.2)', borderLeftColor: 'rgba(255,255,255,0.2)' }} />
+                <span>Creating...</span>
+              </>
+            ) : (
+              <>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                New Note
+              </>
+            )}
           </button>
         </div>
 
