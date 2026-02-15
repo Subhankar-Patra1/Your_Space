@@ -24,12 +24,7 @@ function getGuestId() {
 }
 
 function getUserName() {
-  let name = localStorage.getItem('yourspace-username');
-  if (!name) {
-    name = `Guest ${Math.floor(Math.random() * 10000)}`;
-    localStorage.setItem('yourspace-username', name);
-  }
-  return name;
+  return localStorage.getItem('yourspace-username');
 }
 
 export default function Editor() {
@@ -48,6 +43,8 @@ export default function Editor() {
   const [slashMenu, setSlashMenu] = useState({ isOpen: false, position: null });
   const [images, setImages] = useState([]);
   const [selectedImageId, setSelectedImageId] = useState(null);
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [nameInput, setNameInput] = useState('');
   
   const textareaRef = useRef(null);
   const isRemoteUpdate = useRef(false);
@@ -58,6 +55,12 @@ export default function Editor() {
   useEffect(() => {
     if (!shortId) return;
 
+    const name = getUserName();
+    if (!name) {
+      setShowNameModal(true);
+      return;
+    }
+
     if (!socket.connected) {
       socket.connect();
     }
@@ -65,7 +68,7 @@ export default function Editor() {
     socket.emit('join-document', {
       shortId,
       guestId: getGuestId(),
-      userName: getUserName()
+      userName: name
     });
 
     // Listen for document content
@@ -445,6 +448,23 @@ export default function Editor() {
     }
   };
 
+        }
+    }
+  };
+
+  const handleNameSubmit = (e) => {
+    e.preventDefault();
+    if (nameInput.trim()) {
+      localStorage.setItem('yourspace-username', nameInput.trim());
+      setShowNameModal(false);
+      // Re-trigger effect will happen because we rely on state or we can manually connect
+      // Actually, relying on effect re-run is better if we add a dependency, 
+      // but simpler here: simply reload the page or call connect logic.
+      // Let's just reload to keep it clean and simple for this "gatekeeping" logic
+      window.location.reload(); 
+    }
+  };
+
   const handleDragOver = (e) => {
      e.preventDefault(); 
   };
@@ -462,6 +482,34 @@ export default function Editor() {
   }, [emitCursorPositionFull]);
 
 
+
+  if (showNameModal) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-primary)] p-4">
+        <div className="w-full max-w-md p-6 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-color)] shadow-xl">
+          <h2 className="text-xl font-bold mb-4 text-[var(--text-primary)]">Welcome to Your Space</h2>
+          <p className="mb-6 text-[var(--text-secondary)]">Please enter your name to join this document.</p>
+          <form onSubmit={handleNameSubmit}>
+            <input
+              type="text"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder="Your Name"
+              className="w-full px-4 py-2 mb-4 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
+              autoFocus
+              required
+            />
+            <button
+              type="submit"
+              className="w-full py-2 px-4 bg-[var(--accent)] text-[var(--accent-content)] rounded-lg font-medium hover:opacity-90 transition-opacity"
+            >
+              Join Document
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (!socket || !socket.connected) {
     return (
