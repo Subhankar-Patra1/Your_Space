@@ -84,10 +84,11 @@ export default function Editor() {
       
       let finalContent = newContent;
 
-      if (patches && patches.length > 0) {
+      if (patches) {
         // Apply patches to current local content
-        // Note: dmp.patch_apply returns [newText, results]
-        const [patchedText] = dmp.patch_apply(patches, content);
+        // dmp.patch_fromText parses the text format
+        const patchList = dmp.patch_fromText(patches);
+        const [patchedText] = dmp.patch_apply(patchList, content);
         finalContent = patchedText;
       }
       
@@ -214,7 +215,8 @@ export default function Editor() {
     const newContent = e.target.value;
     
     // Calculate patches (diff) from previous content to new content
-    const patches = dmp.patch_make(content, newContent);
+    const patchList = dmp.patch_make(content, newContent);
+    const patches = dmp.patch_toText(patchList);
 
     setContent(newContent);
     setCharCount(newContent.length);
