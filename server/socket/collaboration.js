@@ -62,10 +62,11 @@ function setupCollaboration(io) {
     });
 
     // Handle text changes
-    socket.on('text-change', ({ shortId, content, cursorPosition, selectionEnd }) => {
+    socket.on('text-change', ({ shortId, content, patches, cursorPosition, selectionEnd }) => {
       // Broadcast to other users in the room — include userInfo so cursor can be updated atomically
       socket.to(shortId).emit('text-change', {
         content,
+        patches,
         cursorPosition,
         selectionEnd,
         userId: socket.id,
