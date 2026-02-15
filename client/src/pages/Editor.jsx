@@ -10,6 +10,9 @@ import remarkGfm from 'remark-gfm';
 import getCaretCoordinates from 'textarea-caret';
 import axios from 'axios';
 import ImageLayer from '../components/ImageLayer';
+import DiffMatchPatch from 'diff-match-patch';
+
+const dmp = new DiffMatchPatch();
 
 function getGuestId() {
   let id = localStorage.getItem('yourspace-guest-id');
@@ -21,7 +24,12 @@ function getGuestId() {
 }
 
 function getUserName() {
-  return localStorage.getItem('yourspace-username') || 'Anonymous';
+  let name = localStorage.getItem('yourspace-username');
+  if (!name) {
+    name = `Guest ${Math.floor(Math.random() * 10000)}`;
+    localStorage.setItem('yourspace-username', name);
+  }
+  return name;
 }
 
 export default function Editor() {
@@ -71,11 +79,21 @@ export default function Editor() {
     };
 
     // Listen for remote text changes — also update cursor position atomically
-    const handleTextChange = ({ content: newContent, cursorPosition, selectionEnd, userId, userInfo }) => {
+    const handleTextChange = ({ content: newContent, patches, cursorPosition, selectionEnd, userId, userInfo }) => {
       isRemoteUpdate.current = true;
-      setContent(newContent);
-      setCharCount(newContent.length);
-      setWordCount(countWords(newContent));
+      
+      let finalContent = newContent;
+
+      if (patches && patches.length > 0) {
+        // Apply patches to current local content
+        // Note: dmp.patch_apply returns [newText, results]
+        const [patchedText] = dmp.patch_apply(patches, content);
+        finalContent = patchedText;
+      }
+      
+      setContent(finalContent);
+      setCharCount(finalContent.length);
+      setWordCount(countWords(finalContent));
 
       // Update remote cursor from the same event to keep position & content in sync
       if (userId && cursorPosition != null) {
@@ -194,6 +212,10 @@ export default function Editor() {
   // Handle local text changes with debounced emit
   const handleContentChange = useCallback((e) => {
     const newContent = e.target.value;
+    
+    // Calculate patches (diff) from previous content to new content
+    const patches = dmp.patch_make(content, newContent);
+
     setContent(newContent);
     setCharCount(newContent.length);
     setWordCount(countWords(newContent));
@@ -209,14 +231,15 @@ export default function Editor() {
       setSaveStatus('saved');
     }, 1000);
 
-    // Emit change to server
+    // Emit change to server (send both full content and patches)
     socket.emit('text-change', {
       shortId,
       content: newContent,
+      patches: patches,
       cursorPosition: e.target.selectionStart,
       selectionEnd: e.target.selectionEnd
     });
-  }, [shortId, socket]); // saveTimerRef is ref so stable
+  }, [shortId, socket, content]); // Needs 'content' to calc diff
 
   // Handle title changes
   const handleTitleChange = useCallback((newTitle) => {
