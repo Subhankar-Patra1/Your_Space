@@ -39,7 +39,7 @@ export default function Dashboard() {
         return;
       }
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const apiUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || '';
         const res = await fetch(`${apiUrl}/api/documents?owner=${guestId}`);
         const data = await res.json();
         setNotes(data);
@@ -53,7 +53,7 @@ export default function Dashboard() {
 
   const handleCreateNew = async () => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const apiUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || '';
       const res = await fetch(`${apiUrl}/api/documents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -69,7 +69,7 @@ export default function Dashboard() {
   const confirmDelete = async () => {
     if (!noteToDelete) return;
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const apiUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || '';
       await fetch(`${apiUrl}/api/documents/${noteToDelete.shortId}`, { method: 'DELETE' });
       setNotes(prev => prev.filter(n => n.shortId !== noteToDelete.shortId));
       setNoteToDelete(null);
