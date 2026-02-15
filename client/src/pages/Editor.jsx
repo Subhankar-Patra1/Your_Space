@@ -136,9 +136,21 @@ export default function Editor() {
     };
     
     // Listen for document metadata
-    const handleDocumentMetadata = ({ title: docTitle, images: docImages }) => {
+    const handleDocumentMetadata = ({ title: docTitle, images: docImages, owner: docOwner }) => {
       setTitle(docTitle || 'Untitled');
       setImages(docImages || []);
+      
+      // Track shared notes: if this note isn't owned by us, save to localStorage
+      const myGuestId = getGuestId();
+      if (docOwner && docOwner !== myGuestId) {
+        try {
+          const shared = JSON.parse(localStorage.getItem('yourspace-shared-notes') || '[]');
+          if (!shared.includes(shortId)) {
+            shared.push(shortId);
+            localStorage.setItem('yourspace-shared-notes', JSON.stringify(shared));
+          }
+        } catch (e) { /* ignore */ }
+      }
     };
 
     // Listen for remote title changes
@@ -194,6 +206,17 @@ export default function Editor() {
       });
     });
 
+    // Re-join document room on socket reconnect (fixes lost sync after pause)
+    const handleReconnect = () => {
+      console.log('🔄 Socket reconnected, re-joining document...');
+      socket.emit('join-document', {
+        shortId,
+        guestId: getGuestId(),
+        userName: name
+      });
+    };
+    socket.on('connect', handleReconnect);
+
     return () => {
       socket.off('sync-update', handleSyncUpdate);
       socket.off('document-metadata', handleDocumentMetadata);
@@ -202,6 +225,7 @@ export default function Editor() {
       socket.off('cursor-move', handleCursorMove);
       socket.off('user-left', handleUserLeft);
       socket.off('image-update');
+      socket.off('connect', handleReconnect);
       ydoc.off('update', handleYjsUpdate);
       ytext.unobserve(handleYtextObserve);
       ydoc.destroy();
@@ -251,7 +275,7 @@ export default function Editor() {
         const next = { ...prev };
         let changed = false;
         Object.keys(next).forEach(id => {
-          if (now - next[id].lastUpdate > 10000) {
+          if (now - next[id].lastUpdate > 60000) {
             delete next[id];
             changed = true;
           }
@@ -380,6 +404,9 @@ export default function Editor() {
     setContent(newValue);
     setCharCount(newValue.length);
     setWordCount(countWords(newValue));
+
+    // Emit cursor position after every local edit so remote users see it move
+    emitCursorPosition();
     
     // Visual save status
     setSaveStatus('saving');
@@ -388,7 +415,7 @@ export default function Editor() {
       setSaveStatus('saved');
     }, 1000);
 
-  }, []);
+  }, [emitCursorPosition]);
 
   // Handle title changes
   const handleTitleChange = useCallback((newTitle) => {

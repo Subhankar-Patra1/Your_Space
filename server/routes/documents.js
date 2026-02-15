@@ -25,6 +25,37 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Fetch multiple documents by shortId list (for shared notes dashboard)
+router.post('/batch', async (req, res) => {
+  try {
+    const { shortIds } = req.body;
+    if (!Array.isArray(shortIds) || shortIds.length === 0) {
+      return res.json([]);
+    }
+    
+    // Limit to 50 to prevent abuse
+    const ids = shortIds.slice(0, 50);
+    
+    const docs = await prisma.document.findMany({
+      where: { shortId: { in: ids } },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        shortId: true,
+        title: true,
+        content: true,
+        owner: true,
+        updatedAt: true,
+        createdAt: true
+      }
+    });
+    
+    res.json(docs);
+  } catch (error) {
+    console.error('Error fetching batch documents:', error);
+    res.status(500).json({ error: 'Failed to fetch documents' });
+  }
+});
+
 // Get a document by shortId
 router.get('/:shortId', async (req, res) => {
   try {

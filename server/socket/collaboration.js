@@ -64,7 +64,8 @@ function setupCollaboration(io) {
             
             socket.emit('document-metadata', {
               title: dbDoc.title,
-              images: dbDoc.images || []
+              images: dbDoc.images || [],
+              owner: dbDoc.owner
             });
           }
         } else {
@@ -73,7 +74,8 @@ function setupCollaboration(io) {
           if (dbDoc) {
             socket.emit('document-metadata', {
               title: dbDoc.title,
-              images: dbDoc.images || []
+              images: dbDoc.images || [],
+              owner: dbDoc.owner
             });
           }
         }
