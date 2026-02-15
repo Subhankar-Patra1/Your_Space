@@ -5,7 +5,6 @@ const Y = require('yjs');
 const activeUsers = new Map();
 
 // In-memory Yjs documents for active rooms
-// Map<shortId, Y.Doc>
 const activeDocs = new Map();
 
 // Debounce timers for auto-save per document
@@ -48,7 +47,6 @@ function setupCollaboration(io) {
         io.to(shortId).emit('presence-update', getActiveUsers(shortId));
 
         // --- Yjs Sync Logic ---
-        // 1. Get or create Y.Doc for this room
         let doc = activeDocs.get(shortId);
         
         if (!doc) {
@@ -58,38 +56,31 @@ function setupCollaboration(io) {
           // Load content from DB into Y.Doc
           const dbDoc = await prisma.document.findUnique({ where: { shortId } });
           if (dbDoc && dbDoc.content) {
-             const ytext = doc.getText('codemirror');
-             if (ytext.toString() !== dbDoc.content) {
-                // Initialize Y.Doc with DB content if simpler
-                // Or just trust that if it's new memory doc, it receives DB content.
-                doc.transact(() => {
-                    ytext.delete(0, ytext.length);
-                    ytext.insert(0, dbDoc.content);
-                });
-             }
-             
-             // Also emit other metadata like title/images
-             socket.emit('document-metadata', {
-                title: dbDoc.title,
-                images: dbDoc.images || []
-             });
+            const ytext = doc.getText('codemirror');
+            doc.transact(() => {
+              ytext.delete(0, ytext.length);
+              ytext.insert(0, dbDoc.content);
+            });
+            
+            socket.emit('document-metadata', {
+              title: dbDoc.title,
+              images: dbDoc.images || []
+            });
           }
         } else {
-             // For existing active doc, we might want to send metadata too if we haven't
-             const dbDoc = await prisma.document.findUnique({ where: { shortId } });
-             if (dbDoc) {
-                 socket.emit('document-metadata', {
-                    title: dbDoc.title,
-                    images: dbDoc.images || []
-                 });
-             }
+          // Existing active doc — send metadata from DB
+          const dbDoc = await prisma.document.findUnique({ where: { shortId } });
+          if (dbDoc) {
+            socket.emit('document-metadata', {
+              title: dbDoc.title,
+              images: dbDoc.images || []
+            });
+          }
         }
 
-        // 2. Send current document state to the new client
-        // Encode state as update
-        const stateVector = Y.encodeStateVector(doc);
-        const diff = Y.encodeStateAsUpdate(doc, stateVector);
-        socket.emit('sync-update', Buffer.from(diff));
+        // Send full document state to the new client
+        const fullState = Y.encodeStateAsUpdate(doc);
+        socket.emit('sync-update', Buffer.from(fullState));
 
         if (process.env.NODE_ENV !== 'production') {
           console.log(`📄 User ${socket.id} joined document: ${shortId}`);
@@ -100,45 +91,51 @@ function setupCollaboration(io) {
       }
     });
 
-    // Handle Yjs Updates
+    // Handle Yjs Updates from clients
     socket.on('sync-update', (update) => {
       const room = currentRoom;
       if (!room) return;
 
       const doc = activeDocs.get(room);
       if (doc) {
-        // Apply update to server in-memory doc
         try {
-            Y.applyUpdate(doc, new Uint8Array(update));
-        } catch(e) {
-            console.error("Error applying update", e);
+          Y.applyUpdate(doc, new Uint8Array(update));
+        } catch (e) {
+          console.error('Error applying Yjs update:', e);
+          return;
         }
 
-        // Broadcast update to ALL other clients in the room
+        // Broadcast to ALL other clients in the room
         socket.to(room).emit('sync-update', update);
 
-        // Schedule save to DB
+        // Schedule auto-save to DB
         debouncedSave(room, doc);
       }
     });
     
-    // Also support getting full update if finding missing sync
+    // Support full state request for resync
     socket.on('sync-step-1', (stateVector) => {
-        const room = currentRoom;
-        if(!room) return;
-        const doc = activeDocs.get(room);
-        if(doc) {
-            const diff = Y.encodeStateAsUpdate(doc, new Uint8Array(stateVector));
-            socket.emit('sync-update', Buffer.from(diff));
-        }
+      const room = currentRoom;
+      if (!room) return;
+      const doc = activeDocs.get(room);
+      if (doc) {
+        const diff = Y.encodeStateAsUpdate(doc, new Uint8Array(stateVector));
+        socket.emit('sync-update', Buffer.from(diff));
+      }
     });
 
-    // Handle previous simple text-change? No, completely replace.
-    
-    // Handle Image Updates (Keep existing logic, independent of Yjs for now or integrate?)
-    // Integrating images into Yjs Map is better, but let's stick to the working ad-hoc solution for images 
-    // to minimize risk, unless requested. User asked for "OT/CRDT" which usually implies text.
-    // We will keep the image handlers as is.
+    // Handle cursor movements — relay Yjs relative positions as-is
+    socket.on('cursor-move', ({ shortId, relativePosition, relativeSelectionEnd }) => {
+      if (!shortId || !userInfo) return;
+      socket.to(shortId).emit('cursor-move', {
+        userId: socket.id,
+        relativePosition,
+        relativeSelectionEnd,
+        userInfo
+      });
+    });
+
+    // Handle Image Updates
     socket.on('image-update', async ({ shortId, image, action }) => {
       socket.to(shortId).emit('image-update', { image, action });
       
@@ -178,16 +175,6 @@ function setupCollaboration(io) {
       }).catch(err => console.error('Error saving title:', err));
     });
 
-    // Handle cursor movements
-    socket.on('cursor-move', ({ shortId, position, selectionEnd }) => {
-      socket.to(shortId).emit('cursor-move', {
-        userId: socket.id,
-        position,
-        selectionEnd,
-        userInfo
-      });
-    });
-
     // Handle disconnect
     socket.on('disconnect', () => {
       if (process.env.NODE_ENV !== 'production') {
@@ -199,20 +186,17 @@ function setupCollaboration(io) {
         io.to(currentRoom).emit('presence-update', users);
         io.to(currentRoom).emit('user-left', { userId: socket.id });
         
-        // If room is empty, we could cleanup activeDocs.get(currentRoom), 
-        // but maybe keep it for a while for quick re-joins?
-        // For now, let's clean it up to save memory if empty.
+        // Clean up if room is empty
         if (users.length === 0) {
-             const doc = activeDocs.get(currentRoom);
-             if (doc) {
-                 // Final save
-                 saveToDB(currentRoom, doc).then(() => {
-                     if (getActiveUsers(currentRoom).length === 0) {
-                        doc.destroy();
-                        activeDocs.delete(currentRoom);
-                     }
-                 });
-             }
+          const doc = activeDocs.get(currentRoom);
+          if (doc) {
+            saveToDB(currentRoom, doc).then(() => {
+              if (getActiveUsers(currentRoom).length === 0) {
+                doc.destroy();
+                activeDocs.delete(currentRoom);
+              }
+            });
+          }
         }
       }
     });
@@ -243,15 +227,17 @@ function getActiveUsers(room) {
 }
 
 async function saveToDB(shortId, doc) {
-    const content = doc.getText('codemirror').toString();
-    try {
-        await prisma.document.update({
-            where: { shortId },
-            data: { content, updatedAt: new Date() }
-        });
-    } catch (error) {
-        console.error(`Error saving document ${shortId}:`, error);
-    }
+  const content = doc.getText('codemirror').toString();
+  try {
+    const existing = await prisma.document.findUnique({ where: { shortId } });
+    if (!existing) return;
+    await prisma.document.update({
+      where: { shortId },
+      data: { content, updatedAt: new Date() }
+    });
+  } catch (error) {
+    console.error(`Error saving document ${shortId}:`, error);
+  }
 }
 
 function debouncedSave(shortId, doc) {

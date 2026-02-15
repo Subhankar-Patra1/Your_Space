@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import socket from '../lib/socket';
 import Navbar from '../components/Navbar';
@@ -10,10 +10,7 @@ import remarkGfm from 'remark-gfm';
 import getCaretCoordinates from 'textarea-caret';
 import axios from 'axios';
 import ImageLayer from '../components/ImageLayer';
-import DiffMatchPatch from 'diff-match-patch';
 import * as Y from 'yjs';
-
-const dmp = new DiffMatchPatch();
 
 function getGuestId() {
   let id = localStorage.getItem('yourspace-guest-id');
@@ -49,15 +46,20 @@ export default function Editor() {
   
   const textareaRef = useRef(null);
   const saveTimerRef = useRef(null);
-  const contentRef = useRef(content); // Track latest content for diffing
   
-  // Yjs References
+  // Yjs references
   const ydocRef = useRef(null);
-
-  // Keep contentRef in sync
-  useEffect(() => {
-    contentRef.current = content;
-  }, [content]);
+  const ytextRef = useRef(null);
+  
+  // Flag to suppress local echo when Yjs observer fires from our own edits
+  const isLocalChangeRef = useRef(false);
+  
+  // Flag to suppress cursor emission during remote content updates
+  const isRemoteUpdateRef = useRef(false);
+  
+  // Store the cursor's Yjs relative position so we can restore it after remote edits
+  const cursorRelPosRef = useRef(null);
+  const cursorRelEndRef = useRef(null);
 
   // Connect socket and join document
   useEffect(() => {
@@ -77,23 +79,45 @@ export default function Editor() {
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
     const ytext = ydoc.getText('codemirror');
+    ytextRef.current = ytext;
 
-    // Handle Yjs local updates -> Socket
-    ydoc.on('update', (update, origin) => {
-        if (origin !== 'remote') {
-            socket.emit('sync-update', update);
-        }
-    });
+    // Send local Yjs updates to server
+    const handleYjsUpdate = (update, origin) => {
+      if (origin !== 'remote') {
+        socket.emit('sync-update', update);
+      }
+    };
+    ydoc.on('update', handleYjsUpdate);
 
-    // Handle Yjs remote updates -> Local State
-    ytext.observe((event) => {
-        if (event.transaction.origin === 'remote') {
-            const newText = ytext.toString();
-            setContent(newText);
-            setCharCount(newText.length);
-            setWordCount(countWords(newText));
+    // When Yjs text changes from a remote update, sync to React state
+    const handleYtextObserve = (event) => {
+      if (event.transaction.origin === 'remote') {
+        // Suppress cursor emission while we update content from remote
+        isRemoteUpdateRef.current = true;
+        
+        const newText = ytext.toString();
+        
+        // Save cursor relative position BEFORE updating content
+        const textarea = textareaRef.current;
+        if (textarea && document.activeElement === textarea) {
+          const curStart = textarea.selectionStart;
+          const curEnd = textarea.selectionEnd;
+          
+          try {
+            cursorRelPosRef.current = Y.createRelativePositionFromTypeIndex(ytext, Math.min(curStart, newText.length));
+            cursorRelEndRef.current = Y.createRelativePositionFromTypeIndex(ytext, Math.min(curEnd, newText.length));
+          } catch (e) {
+            cursorRelPosRef.current = null;
+            cursorRelEndRef.current = null;
+          }
         }
-    });
+        
+        setContent(newText);
+        setCharCount(newText.length);
+        setWordCount(countWords(newText));
+      }
+    };
+    ytext.observe(handleYtextObserve);
 
     socket.emit('join-document', {
       shortId,
@@ -101,22 +125,20 @@ export default function Editor() {
       userName: name
     });
 
-    // Listen for Yjs sync updates
+    // Listen for Yjs sync updates from server
     const handleSyncUpdate = (update) => {
-        try {
-            Y.applyUpdate(ydoc, new Uint8Array(update), 'remote');
-            setIsLoading(false);
-        } catch (e) {
-            console.error('Yjs sync error:', e);
-        }
+      try {
+        Y.applyUpdate(ydoc, new Uint8Array(update), 'remote');
+        setIsLoading(false);
+      } catch (e) {
+        console.error('Yjs sync error:', e);
+      }
     };
     
-    // Listen for document metadata (title, images, initial content fallback)
+    // Listen for document metadata
     const handleDocumentMetadata = ({ title: docTitle, images: docImages }) => {
       setTitle(docTitle || 'Untitled');
       setImages(docImages || []);
-      // Content is handled by Yjs sync, but if we wanted to be sure...
-      // actually Yjs sync handles content.
     };
 
     // Listen for remote title changes
@@ -129,11 +151,16 @@ export default function Editor() {
       setActiveUsers(users);
     };
 
-    // Listen for remote cursor movements
-    const handleCursorMove = ({ userId, position, selectionEnd, userInfo }) => {
+    // Listen for remote cursor movements (Yjs relative positions)
+    const handleCursorMove = ({ userId, relativePosition, relativeSelectionEnd, userInfo }) => {
       setRemoteCursors(prev => ({
         ...prev,
-        [userId]: { position, selectionEnd, userInfo, lastUpdate: Date.now() }
+        [userId]: { 
+          relativePosition, 
+          relativeSelectionEnd, 
+          userInfo, 
+          lastUpdate: Date.now() 
+        }
       }));
     };
 
@@ -146,7 +173,6 @@ export default function Editor() {
       });
     };
 
-    // Clean up handle
     socket.on('sync-update', handleSyncUpdate);
     socket.on('document-metadata', handleDocumentMetadata);
     socket.on('title-change', handleTitleChange);
@@ -176,9 +202,46 @@ export default function Editor() {
       socket.off('cursor-move', handleCursorMove);
       socket.off('user-left', handleUserLeft);
       socket.off('image-update');
+      ydoc.off('update', handleYjsUpdate);
+      ytext.unobserve(handleYtextObserve);
       ydoc.destroy();
     };
   }, [shortId]);
+
+  // Restore cursor position after React re-renders content from remote edits
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    const ydoc = ydocRef.current;
+    if (!textarea || !ydoc || document.activeElement !== textarea) {
+      // Clear the remote update flag even if we can't restore
+      isRemoteUpdateRef.current = false;
+      return;
+    }
+    
+    if (cursorRelPosRef.current && cursorRelEndRef.current) {
+      try {
+        const absStart = Y.createAbsolutePositionFromRelativePosition(cursorRelPosRef.current, ydoc);
+        const absEnd = Y.createAbsolutePositionFromRelativePosition(cursorRelEndRef.current, ydoc);
+        if (absStart && absEnd) {
+          const maxLen = content.length;
+          textarea.setSelectionRange(
+            Math.min(absStart.index, maxLen),
+            Math.min(absEnd.index, maxLen)
+          );
+        }
+      } catch (e) {
+        // Ignore — cursor will just go to default position
+      }
+      cursorRelPosRef.current = null;
+      cursorRelEndRef.current = null;
+    }
+    
+    // Clear the suppression flag after cursor is restored
+    // Use rAF to ensure selectionchange events from setSelectionRange are also suppressed
+    requestAnimationFrame(() => {
+      isRemoteUpdateRef.current = false;
+    });
+  }, [content]);
 
   // Clean up stale cursors (no update in 10s)
   useEffect(() => {
@@ -199,12 +262,16 @@ export default function Editor() {
     return () => clearInterval(interval);
   }, []);
 
-  const pendingCursorRef = useRef(null);
-
-  // Emit cursor position on selection/click/keyup
-  const emitCursorPositionFull = useCallback(() => {
-    if (!textareaRef.current || !shortId) return;
-    const { selectionStart, selectionEnd } = textareaRef.current;
+  // Emit cursor position as Yjs relative position
+  const emitCursorPosition = useCallback(() => {
+    // Don't emit cursor during remote content updates (prevents flash)
+    if (isRemoteUpdateRef.current) return;
+    
+    const textarea = textareaRef.current;
+    const ytext = ytextRef.current;
+    if (!textarea || !ytext || !shortId) return;
+    
+    const { selectionStart, selectionEnd } = textarea;
 
     if (selectionStart !== selectionEnd) {
       setLocalSelection({ start: selectionStart, end: selectionEnd });
@@ -212,48 +279,116 @@ export default function Editor() {
       setLocalSelection(null);
     }
 
-    socket.emit('cursor-move', { shortId, position: selectionStart, selectionEnd });
-  }, [shortId, socket]);
+    try {
+      const textLen = ytext.toString().length;
+      const clampedStart = Math.min(selectionStart, textLen);
+      const clampedEnd = Math.min(selectionEnd, textLen);
+      
+      const relPos = Y.createRelativePositionFromTypeIndex(ytext, clampedStart);
+      const relEnd = Y.createRelativePositionFromTypeIndex(ytext, clampedEnd);
+      
+      socket.emit('cursor-move', {
+        shortId,
+        relativePosition: Y.relativePositionToJSON(relPos),
+        relativeSelectionEnd: Y.relativePositionToJSON(relEnd)
+      });
+    } catch (e) {
+      // If Yjs text is not ready yet, skip
+    }
+  }, [shortId]);
 
-  // Handle local text changes
-  const handleContentChange = useCallback((e) => {
-    const newContent = e.target.value;
-    const currentContent = contentRef.current;
+  // Convert remote relative cursor positions to absolute indices for rendering
+  const visibleCursors = useMemo(() => {
+    if (!ydocRef.current) return {};
     
-    if (!ydocRef.current) return;
-    const ytext = ydocRef.current.getText('codemirror');
+    const ydoc = ydocRef.current;
+    const myId = socket.id;
     
-    // Calculate Diff
-    const diffs = dmp.diff_main(currentContent, newContent);
-    dmp.diff_cleanupSemantic(diffs);
-    
-    // Apply diffs to Y.Text
-    ydocRef.current.transact(() => {
-        let index = 0;
-        diffs.forEach(([op, text]) => {
-            if (op === 0) { // Equal
-                index += text.length;
-            } else if (op === -1) { // Delete
-                ytext.delete(index, text.length);
-            } else if (op === 1) { // Insert
-                ytext.insert(index, text);
-                index += text.length;
-            }
-        });
+    const derived = {};
+    Object.entries(remoteCursors).forEach(([userId, data]) => {
+      if (userId === myId) return;
+
+      try {
+        if (!data.relativePosition) return;
+        
+        const rPos = Y.createRelativePositionFromJSON(data.relativePosition);
+        const rEnd = data.relativeSelectionEnd 
+          ? Y.createRelativePositionFromJSON(data.relativeSelectionEnd) 
+          : rPos;
+        
+        const absPos = Y.createAbsolutePositionFromRelativePosition(rPos, ydoc);
+        const absEnd = Y.createAbsolutePositionFromRelativePosition(rEnd, ydoc);
+        
+        if (absPos && absEnd) {
+          derived[userId] = {
+            position: absPos.index,
+            selectionEnd: absEnd.index,
+            userInfo: data.userInfo,
+            lastUpdate: data.lastUpdate
+          };
+        }
+      } catch (err) {
+        // Skip this cursor if resolution fails
+      }
     });
+    return derived;
+  }, [remoteCursors, content]);
 
-    setContent(newContent);
-    setCharCount(newContent.length);
-    setWordCount(countWords(newContent));
+  // Handle local text changes — apply diff to Yjs
+  const handleContentChange = useCallback((e) => {
+    const textarea = e.target;
+    const newValue = textarea.value;
+    const ytext = ytextRef.current;
+    const ydoc = ydocRef.current;
+    if (!ytext || !ydoc) return;
     
-    // Set saving status (Visual only, sync handles save)
+    const oldValue = ytext.toString();
+    
+    // Find the changed region by comparing old and new values
+    // This is more reliable than diff-match-patch for textarea edits
+    let commonPrefixLen = 0;
+    const minLen = Math.min(oldValue.length, newValue.length);
+    while (commonPrefixLen < minLen && oldValue[commonPrefixLen] === newValue[commonPrefixLen]) {
+      commonPrefixLen++;
+    }
+    
+    let commonSuffixLen = 0;
+    const maxSuffix = minLen - commonPrefixLen;
+    while (
+      commonSuffixLen < maxSuffix &&
+      oldValue[oldValue.length - 1 - commonSuffixLen] === newValue[newValue.length - 1 - commonSuffixLen]
+    ) {
+      commonSuffixLen++;
+    }
+    
+    const deleteCount = oldValue.length - commonPrefixLen - commonSuffixLen;
+    const insertText = newValue.substring(commonPrefixLen, newValue.length - commonSuffixLen);
+    
+    if (deleteCount > 0 || insertText.length > 0) {
+      isLocalChangeRef.current = true;
+      ydoc.transact(() => {
+        if (deleteCount > 0) {
+          ytext.delete(commonPrefixLen, deleteCount);
+        }
+        if (insertText.length > 0) {
+          ytext.insert(commonPrefixLen, insertText);
+        }
+      });
+      isLocalChangeRef.current = false;
+    }
+
+    setContent(newValue);
+    setCharCount(newValue.length);
+    setWordCount(countWords(newValue));
+    
+    // Visual save status
     setSaveStatus('saving');
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       setSaveStatus('saved');
     }, 1000);
 
-  }, [shortId]); // Removed 'socket' and 'content' dependencies, using refs
+  }, []);
 
   // Handle title changes
   const handleTitleChange = useCallback((newTitle) => {
@@ -292,7 +427,7 @@ export default function Editor() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedImageId]);
 
-  // Image Update Handler for ImageLayer
+  // Image Update Handler
   const handleImageUpdate = useCallback((id, updates) => {
      if (!socket) return;
      if (updates === null) {
@@ -302,7 +437,7 @@ export default function Editor() {
          setImages(prev => prev.map(img => img.id === id ? { ...img, ...updates } : img));
          socket.emit('image-update', { shortId, image: { id, ...updates }, action: 'update' });
      }
-  }, [socket, shortId]);
+  }, [shortId]);
 
   // Handle Textarea specific keys (Slash command)
   const handleTextareaKeyDown = (e) => {
@@ -332,7 +467,9 @@ export default function Editor() {
 
   const executeSlashCommand = (cmd) => {
     const textarea = textareaRef.current;
-    if (!textarea) return;
+    const ytext = ytextRef.current;
+    const ydoc = ydocRef.current;
+    if (!textarea || !ytext || !ydoc) return;
 
     const { selectionStart, value } = textarea;
     
@@ -346,22 +483,28 @@ export default function Editor() {
     
     const newValue = textBefore + insertText + textAfter;
     
-    // Manual Update for Slash Command (mimic handleContentChange logic)
-    if (ydocRef.current) {
-        const ytext = ydocRef.current.getText('codemirror');
-        // Simple replace for slash command efficiency? Or use dmp?
-        // Let's use dmp to be consistent and safe
-        const diffs = dmp.diff_main(contentRef.current, newValue);
-        dmp.diff_cleanupSemantic(diffs);
-        ydocRef.current.transact(() => {
-            let index = 0;
-            diffs.forEach(([op, text]) => {
-                if (op === 0) index += text.length;
-                else if (op === -1) ytext.delete(index, text.length);
-                else if (op === 1) { ytext.insert(index, text); index += text.length; }
-            });
-        });
+    // Apply to Yjs
+    const oldValue = ytext.toString();
+    let commonPrefixLen = 0;
+    const minLen = Math.min(oldValue.length, newValue.length);
+    while (commonPrefixLen < minLen && oldValue[commonPrefixLen] === newValue[commonPrefixLen]) {
+      commonPrefixLen++;
     }
+    let commonSuffixLen = 0;
+    const maxSuffix = minLen - commonPrefixLen;
+    while (
+      commonSuffixLen < maxSuffix &&
+      oldValue[oldValue.length - 1 - commonSuffixLen] === newValue[newValue.length - 1 - commonSuffixLen]
+    ) {
+      commonSuffixLen++;
+    }
+    const deleteCount = oldValue.length - commonPrefixLen - commonSuffixLen;
+    const insert = newValue.substring(commonPrefixLen, newValue.length - commonSuffixLen);
+    
+    ydoc.transact(() => {
+      if (deleteCount > 0) ytext.delete(commonPrefixLen, deleteCount);
+      if (insert.length > 0) ytext.insert(commonPrefixLen, insert);
+    });
 
     setContent(newValue);
     setSlashMenu({ isOpen: false, position: null });
@@ -370,20 +513,19 @@ export default function Editor() {
       textarea.focus();
       
       let newCursorPos = textBefore.length + insertText.length;
-      let selectionEnd = newCursorPos;
+      let selEnd = newCursorPos;
       
       if (cmd.id === 'bold' || cmd.id === 'italic') {
         const offset = cmd.id === 'bold' ? 2 : 1;
         newCursorPos = textBefore.length + offset;
-        selectionEnd = newCursorPos + 4;
+        selEnd = newCursorPos + 4;
       } else if (cmd.id === 'code') {
         newCursorPos = textBefore.length + 4;
-        selectionEnd = newCursorPos;
+        selEnd = newCursorPos;
       }
       
-      textarea.setSelectionRange(newCursorPos, selectionEnd);
-      // Cursor move emit handled by click/keyup/select listeners or next tick
-      socket.emit('cursor-move', { shortId, position: newCursorPos, selectionEnd });
+      textarea.setSelectionRange(newCursorPos, selEnd);
+      emitCursorPosition();
     }, 0);
   };
 
@@ -453,12 +595,12 @@ export default function Editor() {
   useEffect(() => {
     const handleSelectionChange = () => {
       if (document.activeElement === textareaRef.current) {
-        emitCursorPositionFull();
+        emitCursorPosition();
       }
     };
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
-  }, [emitCursorPositionFull]);
+  }, [emitCursorPosition]);
 
   if (showNameModal) {
     return (
@@ -533,7 +675,7 @@ export default function Editor() {
       }}>
         {!isPreview && (
           <RemoteCursors
-            cursors={remoteCursors}
+            cursors={visibleCursors}
             textareaRef={textareaRef}
             content={content}
           />
@@ -560,9 +702,9 @@ export default function Editor() {
               className="editor-textarea"
               value={content}
               onChange={handleContentChange}
-              onKeyUp={emitCursorPositionFull}
-              onClick={(e) => { emitCursorPositionFull(); setSelectedImageId(null); }}
-              onSelect={(e) => { emitCursorPositionFull(); }}
+              onKeyUp={emitCursorPosition}
+              onClick={(e) => { emitCursorPosition(); setSelectedImageId(null); }}
+              onSelect={emitCursorPosition}
               onKeyDown={handleTextareaKeyDown}
               onPaste={handlePaste}
               onDrop={handleDrop}
