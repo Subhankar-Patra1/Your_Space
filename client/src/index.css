@@ -400,6 +400,96 @@ body {
   }
 }
 
+/* --- Dashboard Specific Responsive Helpers --- */
+.dashboard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  transition: padding 0.3s ease;
+}
+
+@media (min-width: 641px) {
+  .dashboard-container {
+    padding: 3rem 1.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-container {
+    padding: 1.5rem 1rem;
+  }
+  
+  .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 1.5rem;
+  }
+  
+  .dashboard-header .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .tabs-wrapper {
+    margin-bottom: 1.5rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-bottom: 1px solid var(--border-color);
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding-left: 1rem;
+    scrollbar-width: none; /* Firefox */
+  }
+  
+  .tabs-wrapper::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+
+  .tabs-container {
+    display: flex;
+    white-space: nowrap;
+    min-width: min-content;
+  }
+
+  .selection-bar {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 1rem;
+    padding-bottom: 1rem !important;
+  }
+
+  .selection-bar .selection-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 480px) {
+  .note-card {
+    padding: 1rem;
+  }
+  
+  .note-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.profile-card {
+  max-width: 600px;
+  margin: 0 auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 2rem;
+  transition: padding 0.3s ease;
+}
+
+@media (max-width: 640px) {
+  .profile-card {
+    padding: 1.5rem 1rem;
+    border-radius: 12px;
+  }
+}
+
 @keyframes cursor-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }

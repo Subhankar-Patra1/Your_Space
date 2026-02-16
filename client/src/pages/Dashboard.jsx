@@ -294,13 +294,9 @@ export default function Dashboard() {
     >
       <Navbar isEditor={false} />
 
-      <div style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '3rem 1.5rem'
-      }}>
+      <div className="dashboard-container">
         {/* Header */}
-        <div style={{
+        <div className="dashboard-header" style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -343,7 +339,7 @@ export default function Dashboard() {
         </div>
 
         {/* Tabs + Selection Bar */}
-        <div style={{
+        <div className="selection-bar" style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -351,7 +347,8 @@ export default function Dashboard() {
           borderBottom: '1px solid var(--border-color)',
         }}>
           {/* Tab buttons */}
-          <div style={{ display: 'flex', gap: '0' }}>
+          <div className="tabs-wrapper">
+            <div className="tabs-container">
             <button
               onClick={() => setActiveTab('my-notes')}
               style={{
@@ -456,10 +453,11 @@ export default function Dashboard() {
               Profile
             </button>
           </div>
+          </div>
 
           {/* Selection actions (visible when items exist) */}
           {((activeTab === 'my-notes' && notes.length > 0) || (activeTab === 'shared' && sharedNotes.length > 0)) && (
-            <div style={{
+            <div className="selection-actions" style={{
               display: 'flex',
               alignItems: 'center',
               gap: '0.75rem',
@@ -593,7 +591,7 @@ export default function Dashboard() {
 
             {/* Notes Grid */}
             {!isLoading && notes.length > 0 && (
-              <div style={{
+              <div className="note-grid" style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
                 gap: '1.5rem'
@@ -753,7 +751,7 @@ export default function Dashboard() {
 
             {/* Shared Notes Grid */}
             {!isLoadingShared && sharedNotes.length > 0 && (
-              <div style={{
+              <div className="note-grid" style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
                 gap: '1.5rem'
@@ -861,14 +859,7 @@ export default function Dashboard() {
 
         {/* Profile Tab */}
         {activeTab === 'profile' && (
-          <div style={{
-            maxWidth: '600px',
-            margin: '0 auto',
-            background: 'var(--bg-primary)',
-            borderRadius: '16px',
-            border: '1px solid var(--border-color)',
-            padding: '2rem',
-          }}>
+          <div className="profile-card">
             <h2 style={{
               fontSize: '1.25rem',
               fontWeight: 600,
