@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
@@ -51,10 +52,32 @@ export default function Dashboard() {
   const [selectedNotes, setSelectedNotes] = useState(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [activeTab, setActiveTab] = useState('my-notes');
+  const [profileName, setProfileName] = useState('');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
   const navigate = useNavigate();
   const guestId = getGuestId();
 
   const isSelectMode = selectedNotes.size > 0;
+
+  // Fetch user profile
+  useEffect(() => {
+    if (activeTab === 'profile' && guestId) {
+      const fetchProfile = async () => {
+        try {
+          const apiUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || '';
+          const res = await fetch(`${apiUrl}/api/users/${guestId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setProfileName(data.displayName || 'Anonymous');
+          }
+        } catch (error) {
+          console.error('Failed to fetch profile:', error);
+        }
+      };
+      fetchProfile();
+    }
+  }, [activeTab, guestId]);
 
   useEffect(() => {
     const fetchNotes = async () => {
@@ -147,6 +170,36 @@ export default function Dashboard() {
     }
   };
 
+  const handleSaveProfile = async () => {
+    if (!profileName.trim()) {
+      setProfileMessage({ type: 'error', text: 'Name cannot be empty' });
+      return;
+    }
+    
+    setIsSavingProfile(true);
+    setProfileMessage({ type: '', text: '' });
+    
+    try {
+      const apiUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/users/${guestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: profileName })
+      });
+      
+      if (res.ok) {
+        setProfileMessage({ type: 'success', text: 'Profile updated successfully' });
+        setTimeout(() => setProfileMessage({ type: '', text: '' }), 3000);
+      } else {
+        throw new Error('Failed to update');
+      }
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      setProfileMessage({ type: 'error', text: 'Failed to save changes' });
+    }
+    setIsSavingProfile(false);
+  };
+
   // Single delete click (from trash icon)
   const handleDeleteClick = (e, note) => {
     e.stopPropagation();
@@ -229,7 +282,16 @@ export default function Dashboard() {
   );
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-secondary)' }}>
+    <motion.div 
+      initial={{ opacity: 0, y: 10, filter: 'blur(8px)' }}
+      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+      transition={{ 
+        duration: 0.6, 
+        ease: "easeOut",
+        delay: 0.1 
+      }}
+      style={{ minHeight: '100vh', background: 'var(--bg-secondary)' }}
+    >
       <Navbar isEditor={false} />
 
       <div style={{
@@ -369,6 +431,29 @@ export default function Dashboard() {
                   {totalShared}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveTab('profile')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: activeTab === 'profile' ? 'var(--accent)' : 'var(--text-tertiary)',
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === 'profile' ? '2px solid var(--accent)' : '2px solid transparent',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              Profile
             </button>
           </div>
 
@@ -773,6 +858,119 @@ export default function Dashboard() {
             )}
           </>
         )}
+
+        {/* Profile Tab */}
+        {activeTab === 'profile' && (
+          <div style={{
+            maxWidth: '600px',
+            margin: '0 auto',
+            background: 'var(--bg-primary)',
+            borderRadius: '16px',
+            border: '1px solid var(--border-color)',
+            padding: '2rem',
+          }}>
+            <h2 style={{
+              fontSize: '1.25rem',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              marginBottom: '1.5rem',
+              textAlign: 'center'
+            }}>
+              Your Profile
+            </h2>
+            
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                color: 'var(--text-secondary)',
+                marginBottom: '0.5rem'
+              }}>
+                Display Name
+              </label>
+              <input
+                type="text"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                placeholder="Enter your name"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 1rem',
+                  fontSize: '1rem',
+                  color: 'var(--text-primary)',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--accent)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+              />
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                color: 'var(--text-secondary)',
+                marginBottom: '0.5rem'
+              }}>
+                Guest ID
+              </label>
+              <div style={{
+                padding: '0.75rem 1rem',
+                fontSize: '0.875rem',
+                color: 'var(--text-tertiary)',
+                background: 'var(--bg-secondary)',
+                border: '1px dashed var(--border-color)',
+                borderRadius: '8px',
+                fontFamily: 'monospace'
+              }}>
+                {guestId}
+              </div>
+              <p style={{
+                marginTop: '0.5rem',
+                fontSize: '0.75rem',
+                color: 'var(--text-tertiary)'
+              }}>
+                This ID uniquely identifies you on this device.
+              </p>
+            </div>
+
+            {profileMessage.text && (
+              <div style={{
+                marginBottom: '1.5rem',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                fontSize: '0.875rem',
+                textAlign: 'center',
+                background: profileMessage.type === 'success' ? 'rgba(var(--accent-rgb), 0.1)' : 'rgba(255, 0, 0, 0.1)',
+                color: profileMessage.type === 'success' ? 'var(--accent)' : 'red',
+              }}>
+                {profileMessage.text}
+              </div>
+            )}
+
+            <button
+              className="btn-primary"
+              onClick={handleSaveProfile}
+              disabled={isSavingProfile}
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              {isSavingProfile ? (
+                <>
+                  <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2, borderTopColor: 'var(--accent-content)', borderRightColor: 'rgba(255,255,255,0.2)', borderBottomColor: 'rgba(255,255,255,0.2)', borderLeftColor: 'rgba(255,255,255,0.2)' }} />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       <DeleteConfirmationModal
@@ -783,6 +981,6 @@ export default function Dashboard() {
         count={deleteCount}
         isDeleting={isDeleting}
       />
-    </div>
+    </motion.div>
   );
 }
