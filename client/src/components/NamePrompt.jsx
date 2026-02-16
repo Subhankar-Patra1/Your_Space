@@ -35,21 +35,17 @@ export default function NamePrompt({ onNameSet }) {
       transform: isAnimating ? 'scale(0.98)' : 'scale(1)'
     }}>
       {/* Logo */}
-      <div style={{
-        width: 48,
-        height: 48,
-        borderRadius: '12px',
-        background: 'var(--text-primary)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--bg-primary)',
-        marginBottom: '2rem'
-      }}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
-        </svg>
-      </div>
+      <img 
+        src="/favicon.svg" 
+        alt="Your Space Logo" 
+        style={{ 
+          width: 56, 
+          height: 56, 
+          borderRadius: '14px',
+          marginBottom: '2rem',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.12)'
+        }} 
+      />
 
       {/* Title */}
       <h1 style={{

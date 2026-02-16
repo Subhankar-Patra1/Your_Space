@@ -282,7 +282,7 @@ const LandingPage = () => {
               y: y1
             }}
           >
-            <div className="relative bg-black rounded-xl border border-[#FF4F00]/30 shadow-[0_0_50px_rgba(255,79,0,0.15)] overflow-hidden aspect-video group flex flex-col">
+            <div className="dark relative bg-black rounded-xl border border-[#FF4F00]/30 shadow-[0_0_50px_rgba(255,79,0,0.15)] overflow-hidden aspect-video group flex flex-col">
               
               {/* Window Header */}
               <div className="glass-panel w-full px-4 py-3 flex items-center justify-between border-b border-white/5 z-20" style={{ backgroundColor: '#121212' }}>
