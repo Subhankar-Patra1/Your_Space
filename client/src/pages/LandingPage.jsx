@@ -92,7 +92,7 @@ const WarpButton = ({ children, className, onClick }) => {
     <button 
       onClick={handleNav}
       disabled={isNavigating}
-      className={`group relative overflow-hidden transition-all ${className} ${isNavigating ? 'cursor-wait' : ''}`}
+      className={`group relative overflow-hidden transition-all whitespace-nowrap ${className} ${isNavigating ? 'cursor-wait' : ''}`}
     >
       {isNavigating ? (
         <>
@@ -124,7 +124,7 @@ const WarpButton = ({ children, className, onClick }) => {
                   ))}
               </motion.div>
           </div>
-          <span className="opacity-0">{children}</span>
+          <span className="relative flex items-center gap-2 opacity-0">{children}</span>
         </>
       ) : (
         <>
