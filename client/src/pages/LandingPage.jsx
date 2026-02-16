@@ -19,6 +19,17 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Lenis from 'lenis'; // Import Lenis
+import axios from 'axios'; // Import axios for API calls
+
+// Helper for guest ID
+const getGuestId = () => {
+  let id = localStorage.getItem('yourspace-guest-id');
+  if (!id) {
+    id = 'guest_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    localStorage.setItem('yourspace-guest-id', id);
+  }
+  return id;
+};
 
 // Typing Simulation Hook
 const useTypingEffect = (text, delay = 0, speed = 80, pauseEnd = 2000, pauseStart = 500) => {
@@ -80,12 +91,25 @@ const WarpButton = ({ children, className, onClick }) => {
   const [isNavigating, setIsNavigating] = useState(false);
   const navigate = useNavigate();
 
-  const handleNav = (e) => {
-    if (onClick) onClick(e);
+  const handleNav = async (e) => {
+    e.preventDefault();
+    if (isNavigating) return;
+    
     setIsNavigating(true);
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 1500);
+    
+    try {
+      if (onClick) {
+        // If an onClick is provided, we wait for it to finish (e.g., API call)
+        await onClick(e);
+      } else {
+        // Default behavior if no custom logic: wait for animation and navigate to dashboard
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      console.error('Navigation failed:', err);
+      setIsNavigating(false);
+    }
   };
 
   return (
@@ -185,6 +209,23 @@ const LandingPage = () => {
   const sarahText = useTypingEffect("living, breathing entity that adapts to your thoughts.", 1000, 80);
   const alexText = useTypingEffect("We are building together in real-time.", 2500, 100);
 
+  const handleStartWriting = async (e) => {
+    // This is called by WarpButton's onClick
+    try {
+      const guestId = getGuestId();
+      const apiUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || '';
+      const res = await axios.post(`${apiUrl}/api/documents`, { owner: guestId });
+      
+      // Wait for the animation to play a bit before navigating
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      navigate(`/note/${res.data.shortId}`);
+    } catch (err) {
+      console.error('Failed to create note:', err);
+      // Re-throw to WarpButton can reset its state
+      throw err;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#050505] text-white overflow-hidden selection:bg-[#FF4F00]/30 selection:text-[#FF4F00]">
       {/* Background Ambience - Hardware Accelerated */}
@@ -215,7 +256,10 @@ const LandingPage = () => {
               >
                 Features
               </a>
-              <WarpButton className="px-6 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-sm font-medium">
+              <WarpButton 
+                onClick={handleStartWriting}
+                className="px-6 py-2 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-sm font-medium"
+              >
                 Get Started <ArrowRight size={14} />
               </WarpButton>
             </div>
@@ -259,11 +303,31 @@ const LandingPage = () => {
                     type="text" 
                     placeholder="/create-new-note"
                     className="w-full bg-transparent border-none outline-none text-white font-mono text-sm placeholder-gray-600 h-10"
-                    onKeyDown={(e) => e.key === 'Enter' && navigate('/dashboard')}
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter') {
+                        try {
+                          const guestId = getGuestId();
+                          const apiUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || '';
+                          const res = await axios.post(`${apiUrl}/api/documents`, { owner: guestId });
+                          navigate(`/note/${res.data.shortId}`);
+                        } catch (err) {
+                          console.error('Failed to create note:', err);
+                        }
+                      }
+                    }}
                   />
                 </div>
                 <button 
-                  onClick={() => navigate('/dashboard')}
+                  onClick={async () => {
+                    try {
+                      const guestId = getGuestId();
+                      const apiUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || '';
+                      const res = await axios.post(`${apiUrl}/api/documents`, { owner: guestId });
+                      navigate(`/note/${res.data.shortId}`);
+                    } catch (err) {
+                      console.error('Failed to create note:', err);
+                    }
+                  }}
                   className="bg-[#1E1E1E] hover:bg-[#2A2A2A] text-white p-2 rounded-md border border-white/5 transition-colors"
                 >
                   <ArrowRight size={16} />
@@ -525,7 +589,10 @@ const LandingPage = () => {
         <section className="w-full py-20 text-center relative overflow-hidden rounded-3xl border border-white/5 bg-white/[0.02] max-w-5xl mx-auto mb-20 px-4">
             <div className="absolute inset-0 bg-gradient-to-t from-[#FF4F00]/10 to-transparent opacity-50 pointer-events-none"></div>
             <h3 className="relative text-3xl md:text-5xl font-bold mb-8 font-display">Ready to define <span className="text-white/50">the new standard?</span></h3>
-            <WarpButton className="bg-white text-black hover:bg-gray-200 px-8 py-4 rounded-full font-bold text-lg transform hover:scale-105 hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+            <WarpButton 
+                onClick={handleStartWriting}
+                className="bg-white text-black hover:bg-gray-200 px-8 py-4 rounded-full font-bold text-lg transform hover:scale-105 hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+            >
                 Start Writing Now
             </WarpButton>
             <div className="mt-20 flex justify-center space-x-6 relative z-10">
