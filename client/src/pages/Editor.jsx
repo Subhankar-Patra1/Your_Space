@@ -697,12 +697,11 @@ export default function Editor() {
         onTogglePreview={() => setIsPreview(!isPreview)}
       />
 
-      <div style={{
+      <div className="editor-container" style={{
         flex: 1,
         maxWidth: '780px',
         width: '100%',
         margin: '0 auto',
-        padding: '0 2rem',
         position: 'relative',
         display: 'flex',
         flexDirection: 'column'
@@ -758,7 +757,7 @@ export default function Editor() {
         )}
       </div>
 
-      <div style={{
+      <div className="stats-bar" style={{
         position: 'fixed',
         bottom: 0,
         left: 0,
@@ -770,10 +769,11 @@ export default function Editor() {
         fontSize: '0.75rem',
         color: 'var(--text-tertiary)',
         fontFamily: 'var(--font-mono)',
-        pointerEvents: 'none'
+        pointerEvents: 'none',
+        background: 'linear-gradient(to top, var(--bg-secondary), transparent)',
       }}>
-        <span>{charCount.toLocaleString()} chars</span>
-        <span>{wordCount.toLocaleString()} words</span>
+        <span>{charCount.toLocaleString()} <span className="hidden sm:inline">chars</span><span className="sm:hidden">c</span></span>
+        <span>{wordCount.toLocaleString()} <span className="hidden sm:inline">words</span><span className="sm:hidden">w</span></span>
       </div>
 
       <ShareModal

@@ -294,17 +294,18 @@ export default function Dashboard() {
     >
       <Navbar isEditor={false} />
 
-      <div className="dashboard-container">
+      <div className="dashboard-container dashboard-scroll-layout">
+        <div className="dashboard-fixed-header">
         {/* Header */}
         <div className="dashboard-header" style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '2rem'
+          marginBottom: '1rem'
         }}>
           <div>
             <h1 style={{
-              fontSize: '2rem',
+              fontSize: '1.5rem',
               fontWeight: 700,
               color: 'var(--text-primary)',
               letterSpacing: '-0.02em',
@@ -350,7 +351,7 @@ export default function Dashboard() {
           <div className="tabs-wrapper">
             <div className="tabs-container">
             <button
-              onClick={() => setActiveTab('my-notes')}
+              onClick={(e) => { setActiveTab('my-notes'); e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' }); }}
               style={{
                 padding: '0.75rem 1.5rem',
                 fontSize: '0.875rem',
@@ -388,7 +389,7 @@ export default function Dashboard() {
               </span>
             </button>
             <button
-              onClick={() => setActiveTab('shared')}
+              onClick={(e) => { setActiveTab('shared'); e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' }); }}
               style={{
                 padding: '0.75rem 1.5rem',
                 fontSize: '0.875rem',
@@ -430,7 +431,7 @@ export default function Dashboard() {
               )}
             </button>
             <button
-              onClick={() => setActiveTab('profile')}
+              onClick={(e) => { setActiveTab('profile'); e.currentTarget.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' }); }}
               style={{
                 padding: '0.75rem 1.5rem',
                 fontSize: '0.875rem',
@@ -521,7 +522,9 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+        </div>{/* End fixed header */}
 
+        <div className="dashboard-scrollable-content">
         {/* My Notes Tab */}
         {activeTab === 'my-notes' && (
           <>
@@ -661,7 +664,9 @@ export default function Dashboard() {
                         WebkitLineClamp: 3,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
-                        height: '4.2em'
+                        height: '4.2em',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word'
                       }}>
                         {getPreview(note.content, 140)}
                       </p>
@@ -821,7 +826,9 @@ export default function Dashboard() {
                         WebkitLineClamp: 3,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
-                        height: '4.2em'
+                        height: '4.2em',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word'
                       }}>
                         {getPreview(note.content, 140)}
                       </p>
@@ -861,16 +868,16 @@ export default function Dashboard() {
         {activeTab === 'profile' && (
           <div className="profile-card">
             <h2 style={{
-              fontSize: '1.25rem',
+              fontSize: '1.1rem',
               fontWeight: 600,
               color: 'var(--text-primary)',
-              marginBottom: '1.5rem',
+              marginBottom: '1rem',
               textAlign: 'center'
             }}>
               Your Profile
             </h2>
             
-            <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ marginBottom: '1rem' }}>
               <label style={{
                 display: 'block',
                 fontSize: '0.875rem',
@@ -901,7 +908,7 @@ export default function Dashboard() {
               />
             </div>
 
-            <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ marginBottom: '1rem' }}>
               <label style={{
                 display: 'block',
                 fontSize: '0.875rem',
@@ -933,7 +940,7 @@ export default function Dashboard() {
 
             {profileMessage.text && (
               <div style={{
-                marginBottom: '1.5rem',
+                marginBottom: '1rem',
                 padding: '0.75rem',
                 borderRadius: '8px',
                 fontSize: '0.875rem',
@@ -962,6 +969,7 @@ export default function Dashboard() {
             </button>
           </div>
         )}
+        </div>{/* End scrollable content */}
       </div>
 
       <DeleteConfirmationModal

@@ -11,9 +11,10 @@ export default function ThemeToggle() {
       return;
     }
 
-    // Get click position
-    const x = e.clientX;
-    const y = e.clientY;
+    // Get click position or fallback to center of button
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX || rect.left + rect.width / 2;
+    const y = e.clientY || rect.top + rect.height / 2;
 
     // Calculate distance to furthest corner
     const endRadius = Math.hypot(

@@ -235,7 +235,7 @@ const LandingPage = () => {
               <span className="text-xs font-mono text-gray-400">READY FOR COLLABORATION</span>
             </div>
             
-            <h1 className="text-6xl md:text-8xl lg:text-[10rem] leading-[0.9] font-display font-bold tracking-tighter mb-4">
+            <h1 className="text-5xl sm:text-6xl md:text-8xl lg:text-[10rem] leading-[0.9] font-display font-bold tracking-tighter mb-4">
               FLUID <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-br from-white via-gray-200 to-gray-600">COLLABORATION</span>
             </h1>
@@ -244,8 +244,8 @@ const LandingPage = () => {
               IN YOUR SPACE
             </div>
 
-            <p className="max-w-2xl mx-auto text-xl text-gray-400 leading-relaxed mb-12">
-              The real-time markdown editor designed for your stream of consciousness. <br/>
+            <p className="max-w-2xl mx-auto text-lg md:text-xl text-gray-400 leading-relaxed mb-12 px-4">
+              The real-time markdown editor designed for your stream of consciousness. <br className="hidden md:block"/>
               Drop images. Slash commands. <span className="text-[#FF4F00]">Zero friction.</span>
             </p>
 
@@ -370,10 +370,10 @@ const LandingPage = () => {
 
         {/* System Capabilities Section */}
         <section id="features" className="w-full mb-40 relative z-30 py-20 mt-20">
-          <div className="mb-20 text-center">
-            <h2 className="text-5xl md:text-6xl font-bold tracking-tighter mb-4 font-display">SYSTEM <span className="text-gray-600">CAPABILITIES</span></h2>
+          <div className="mb-20 text-center px-4">
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-4 font-display uppercase">SYSTEM <span className="text-gray-600">CAPABILITIES</span></h2>
             <div className="w-24 h-1 bg-[#FF4F00] mx-auto mb-8"></div>
-            <p className="text-gray-400 max-w-xl mx-auto font-light">Engineered for speed, built for permanence. The underlying architecture.</p>
+            <p className="text-gray-400 max-w-xl mx-auto font-light text-sm md:text-base">Engineered for speed, built for permanence. The underlying architecture.</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto px-4">

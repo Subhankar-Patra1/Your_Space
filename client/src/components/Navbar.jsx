@@ -21,17 +21,15 @@ export default function Navbar({
   return (
     <nav className="navbar">
       {/* Left section */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3">
         <Link
           to="/"
-          className="flex items-center gap-2.5 no-underline group"
+          className={`items-center gap-2.5 no-underline group ${isEditor ? 'hidden md:flex' : 'flex'}`}
         >
-          <div className="w-8 h-8 rounded-lg bg-[var(--text-primary)] flex items-center justify-center color-[var(--bg-primary)] text-[var(--bg-primary)]">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
-            </svg>
+          <div className="w-8 h-8 rounded-lg border border-[var(--text-primary)] flex items-center justify-center overflow-hidden">
+            <img src="/favicon.svg" alt="Logo" className="w-full h-full object-cover" />
           </div>
-          <span className="hidden sm:block text-base font-semibold text-[var(--text-primary)] tracking-tight">
+          <span className={`${isEditor ? 'hidden lg:block' : 'hidden sm:block'} text-base font-semibold text-[var(--text-primary)] tracking-tight`}>
             Your Space
           </span>
         </Link>
@@ -45,8 +43,8 @@ export default function Navbar({
               value={title || ''}
               onChange={(e) => onTitleChange?.(e.target.value)}
               placeholder="Untitled"
-              className="h-8 bg-transparent border border-transparent hover:border-[var(--border-color)] focus:bg-[var(--bg-secondary)] focus:border-[var(--border-color)] rounded-lg outline-none text-sm font-semibold text-[var(--text-primary)] w-32 sm:w-48 transition-all placeholder:text-[var(--text-tertiary)]"
-              style={{ paddingLeft: '8px', paddingRight: '16px' }}
+              className="h-8 bg-transparent border border-transparent hover:border-[var(--border-color)] focus:bg-[var(--bg-secondary)] focus:border-[var(--border-color)] rounded-lg outline-none text-sm font-semibold text-[var(--text-primary)] w-16 xs:w-16 sm:w-48 transition-all placeholder:text-[var(--text-tertiary)]"
+              style={{ paddingLeft: '4px', paddingRight: '4px' }}
               onFocus={(e) => { e.target.placeholder = ''; }}
               onBlur={(e) => { e.target.placeholder = 'Untitled'; }}
             />
@@ -56,16 +54,16 @@ export default function Navbar({
 
       {/* Center section — Presence (editor only) */}
       {isEditor && (
-        <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex">
+        <div className="absolute left-1/2 -translate-x-1/2 hidden lg:flex">
           <PresenceIndicator users={activeUsers} />
         </div>
       )}
 
       {/* Right section */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2">
         {/* Save status (editor only) */}
         {isEditor && (
-          <div className={`save-indicator ${saveStatus} hidden sm:flex`}>
+          <div className={`save-indicator ${saveStatus} hidden lg:flex`}>
             <span className="dot" />
             <span>
               {saveStatus === 'saving' && 'Saving'}
@@ -78,7 +76,7 @@ export default function Navbar({
         {isEditor && (
           <button
             onClick={onTogglePreview}
-            className="btn-ghost tooltip p-1.5"
+            className="btn-ghost tooltip p-1.5 hidden sm:flex"
             data-tip={isPreview ? 'Edit mode' : 'Preview mode'}
             aria-label="Toggle preview"
           >
@@ -98,16 +96,30 @@ export default function Navbar({
 
         {/* Share button (editor only) */}
         {isEditor && (
-          <button className="btn-primary py-1.5 px-3 sm:px-5 text-sm" onClick={onShare}>
-            Share
+          <button className="btn-primary p-0 w-9 h-9 flex items-center justify-center rounded-full sm:rounded-lg sm:py-1.5 sm:px-4 sm:w-auto" onClick={onShare} style={{ background: 'var(--text-primary)', color: 'var(--bg-primary)', border: 'none' }}>
+            <span className="hidden sm:inline">Share</span>
+            <span className="sm:hidden">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                <polyline points="16 6 12 2 8 6" />
+                <line x1="12" y1="2" x2="12" y2="15" />
+              </svg>
+            </span>
           </button>
         )}
 
         {/* Dashboard link */}
         <Link to="/dashboard" className="no-underline">
-          <button className="btn-ghost px-3 py-1.5">
+          <button
+            className="btn-ghost sm:px-3 sm:py-1.5 p-0 sm:w-auto w-9 h-9 flex items-center justify-center rounded-full"
+            style={location.pathname === '/dashboard' ? {
+              background: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+            } : {}}
+          >
              <span className="hidden sm:inline">My Notes</span>
-             <span className="sm:hidden">
+             <span className="sm:hidden leading-none">
                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
              </span>
           </button>

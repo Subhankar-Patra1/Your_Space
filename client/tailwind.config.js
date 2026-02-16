@@ -29,6 +29,9 @@ module.exports = {
         'liquid-metal': 'linear-gradient(135deg, #E0E0E0 0%, #FFFFFF 25%, #A0A0A0 50%, #FFFFFF 75%, #C0C0C0 100%)',
         'glass-gradient': 'linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02))',
       },
+      screens: {
+        xs: '375px',
+      },
     },
   },
   plugins: [

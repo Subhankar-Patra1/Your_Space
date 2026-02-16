@@ -26,7 +26,7 @@ export default function ShareModal({ isOpen, onClose, shortId }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+      <div className="modal-content" style={{ width: '95%', maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={{
           display: 'flex',
@@ -87,7 +87,8 @@ export default function ShareModal({ isOpen, onClose, shortId }) {
           <div>
             <div style={{
               display: 'flex',
-              gap: '8px'
+              gap: '8px',
+              flexWrap: 'wrap'
             }}>
               <input
                 ref={inputRef}
@@ -95,7 +96,8 @@ export default function ShareModal({ isOpen, onClose, shortId }) {
                 value={noteUrl}
                 readOnly
                 style={{
-                  flex: 1,
+                  flex: '1 1 200px',
+                  minWidth: '0',
                   padding: '8px 12px',
                   borderRadius: '8px',
                   border: '1px solid var(--border-color)',
@@ -103,14 +105,16 @@ export default function ShareModal({ isOpen, onClose, shortId }) {
                   color: 'var(--text-secondary)',
                   fontSize: '0.8125rem',
                   fontFamily: 'var(--font-mono)',
-                  outline: 'none'
+                  outline: 'none',
+                  textOverflow: 'ellipsis'
                 }}
               />
               <button
                 className="btn-primary"
                 onClick={handleCopy}
                 style={{
-                  minWidth: '80px',
+                  flex: '1 0 80px',
+                  justifyContent: 'center',
                   background: copied ? 'var(--success)' : undefined,
                   border: copied ? '1px solid var(--success)' : undefined
                 }}

@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 
 export default function DeleteConfirmationModal({ isOpen, onClose, onConfirm, noteTitle, count = 1, isDeleting = false }) {
   if (!isOpen) return null;
@@ -9,12 +10,12 @@ export default function DeleteConfirmationModal({ isOpen, onClose, onConfirm, no
     ? `Are you sure you want to delete ${count} notes? This action cannot be undone.`
     : null;
 
-  return (
+  return ReactDOM.createPortal(
     <div className="modal-overlay" onClick={isDeleting ? undefined : onClose}>
       <div 
         className="modal-content" 
         onClick={e => e.stopPropagation()}
-        style={{ maxWidth: '320px', padding: '1.5rem', textAlign: 'center' }}
+        style={{ width: '90%', maxWidth: '320px', padding: '1.5rem', textAlign: 'center' }}
       >
         <div style={{
           width: 48,
@@ -94,6 +95,7 @@ export default function DeleteConfirmationModal({ isOpen, onClose, onConfirm, no
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
