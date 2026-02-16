@@ -53,6 +53,7 @@ export default function Dashboard() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [activeTab, setActiveTab] = useState('my-notes');
   const [profileName, setProfileName] = useState('');
+  const [initialProfileName, setInitialProfileName] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState({ type: '', text: '' });
   const navigate = useNavigate();
@@ -69,7 +70,9 @@ export default function Dashboard() {
           const res = await fetch(`${apiUrl}/api/users/${guestId}`);
           if (res.ok) {
             const data = await res.json();
-            setProfileName(data.displayName || 'Anonymous');
+            const name = data.displayName || 'Anonymous';
+            setProfileName(name);
+            setInitialProfileName(name);
           }
         } catch (error) {
           console.error('Failed to fetch profile:', error);
@@ -189,6 +192,7 @@ export default function Dashboard() {
       
       if (res.ok) {
         setProfileMessage({ type: 'success', text: 'Profile updated successfully' });
+        setInitialProfileName(profileName);
         setTimeout(() => setProfileMessage({ type: '', text: '' }), 3000);
       } else {
         throw new Error('Failed to update');
@@ -955,8 +959,14 @@ export default function Dashboard() {
             <button
               className="btn-primary"
               onClick={handleSaveProfile}
-              disabled={isSavingProfile}
-              style={{ width: '100%', justifyContent: 'center' }}
+              disabled={isSavingProfile || profileName === initialProfileName || !profileName.trim()}
+              style={{ 
+                width: '100%', 
+                justifyContent: 'center',
+                opacity: (profileName === initialProfileName || !profileName.trim()) ? 0.5 : 1,
+                cursor: (profileName === initialProfileName || !profileName.trim()) ? 'default' : 'pointer',
+                transition: 'all 0.2s ease'
+              }}
             >
               {isSavingProfile ? (
                 <>

@@ -1,16 +1,30 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 export default function NamePrompt({ onNameSet }) {
   const [name, setName] = useState('');
   const [isAnimating, setIsAnimating] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
 
     setIsAnimating(true);
+    
+    // Save locally
     localStorage.setItem('yourspace-username', trimmed);
+    const guestId = localStorage.getItem('yourspace-guest-id');
+
+    // Sync to server
+    if (guestId) {
+      try {
+        const apiUrl = import.meta.env.VITE_SERVER_URL || import.meta.env.VITE_API_URL || '';
+        await axios.put(`${apiUrl}/api/users/${guestId}`, { displayName: trimmed });
+      } catch (error) {
+        console.error('Failed to sync name to server:', error);
+      }
+    }
 
     // Brief animation before proceeding
     setTimeout(() => {
