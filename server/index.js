@@ -28,6 +28,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/documents', documentRoutes);
+app.use('/api/users', require('./routes/users'));
 
 // File Upload Setup
 const multer = require('multer');
