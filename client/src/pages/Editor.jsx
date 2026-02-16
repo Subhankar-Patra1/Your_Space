@@ -60,6 +60,9 @@ export default function Editor() {
   // Store the cursor's Yjs relative position so we can restore it after remote edits
   const cursorRelPosRef = useRef(null);
   const cursorRelEndRef = useRef(null);
+  
+  // rAF guard for cursor emission throttling
+  const cursorRafRef = useRef(null);
 
   // Connect socket and join document
   useEffect(() => {
@@ -304,7 +307,7 @@ export default function Editor() {
     }
 
     try {
-      const textLen = ytext.toString().length;
+      const textLen = ytext.length;
       const clampedStart = Math.min(selectionStart, textLen);
       const clampedEnd = Math.min(selectionEnd, textLen);
       
@@ -405,8 +408,12 @@ export default function Editor() {
     setCharCount(newValue.length);
     setWordCount(countWords(newValue));
 
-    // Emit cursor position after every local edit so remote users see it move
-    emitCursorPosition();
+    // Throttle cursor emission using rAF to avoid flooding socket
+    if (cursorRafRef.current) cancelAnimationFrame(cursorRafRef.current);
+    cursorRafRef.current = requestAnimationFrame(() => {
+      emitCursorPosition();
+      cursorRafRef.current = null;
+    });
     
     // Visual save status
     setSaveStatus('saving');

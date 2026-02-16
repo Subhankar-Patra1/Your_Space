@@ -129,7 +129,7 @@ function setupCollaboration(io) {
     // Handle cursor movements — relay Yjs relative positions as-is
     socket.on('cursor-move', ({ shortId, relativePosition, relativeSelectionEnd }) => {
       if (!shortId || !userInfo) return;
-      socket.to(shortId).emit('cursor-move', {
+      socket.volatile.to(shortId).emit('cursor-move', {
         userId: socket.id,
         relativePosition,
         relativeSelectionEnd,
